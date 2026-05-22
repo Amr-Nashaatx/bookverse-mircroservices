@@ -1,0 +1,13 @@
+services:
+    db:
+        image: postgres
+        restart: always
+        container_name: postgres-db
+        env_file:
+            - .env.dev
+        environment:
+            POSTGRES_PASSWORD: ${DB_PASSWORD}
+        volumes:
+            - postgres_data:/var/lib/postgresql/data
+volumes:
+    postgres_data:
