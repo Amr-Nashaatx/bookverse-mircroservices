@@ -1,0 +1,9 @@
+{
+  "name": "bookverse",
+  "private": true,
+  "workspaces": [
+    "packages/shared",
+    "packages/gateway",
+    "packages/services/*"
+  ]
+}
