@@ -1,8 +1,9 @@
 export interface Shelf {
-  user: string;
-  name: string;
-  description?: string;
-  books: string[];
-  createdAt: Date;
-  updatedAt: Date;
+    id: string;
+    userId: string;
+    name: string;
+    description?: string;
+    bookIds: string[];
+    createdAt: Date;
+    updatedAt: Date;
 }

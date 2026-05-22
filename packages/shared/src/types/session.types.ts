@@ -1,6 +1,7 @@
 export interface Session {
-  userId: string;
-  refreshTokenHash: string;
-  expiresAt: Date;
-  revokedAt?: Date;
+    id: string;
+    userId: string;
+    refreshTokenHash: string;
+    expiresAt: Date;
+    revokedAt?: Date;
 }

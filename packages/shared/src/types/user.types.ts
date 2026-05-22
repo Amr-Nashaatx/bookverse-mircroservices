@@ -1,11 +1,15 @@
-export interface User {
-  name: string;
-  email: string;
-  password: string;
-  role: "user" | "admin" | "author";
-  avatar: string;
-  isAuthor: boolean;
-  createdAt: Date;
-  updatedAt: Date;
-  authorId: string;
+export type UserRole = 'user' | 'admin' | 'author';
+
+export interface UserPublic {
+    id: string;
+    name: string;
+    email: string;
+    role: UserRole;
+    avatar: string;
+    createdAt: Date;
+    updatedAt: Date;
+}
+
+export interface User extends UserPublic {
+    password: string;
 }
