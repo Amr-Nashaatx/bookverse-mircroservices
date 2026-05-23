@@ -1,9 +1,12 @@
 {
-  "name": "bookverse",
-  "private": true,
-  "workspaces": [
-    "packages/shared",
-    "packages/gateway",
-    "packages/services/*"
-  ]
+    "name": "bookverse",
+    "private": true,
+    "scripts": {
+        "compose": "docker compose --env-file .env.dev up -d"
+    },
+    "workspaces": [
+        "packages/shared",
+        "packages/gateway",
+        "packages/services/*"
+    ]
 }

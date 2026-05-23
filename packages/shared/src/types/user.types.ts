@@ -5,7 +5,7 @@ export interface UserPublic {
     name: string;
     email: string;
     role: UserRole;
-    avatar: string;
+    avatar?: string;
     createdAt: Date;
     updatedAt: Date;
 }
