@@ -1,0 +1,7 @@
+CREATE DATABASE auth_db;
+CREATE DATABASE books_db;
+CREATE DATABASE reviews_db;
+CREATE DATABASE shelf_db;
+CREATE DATABASE author_db;
+CREATE DATABASE notifications_db;
+CREATE DATABASE user_db;
