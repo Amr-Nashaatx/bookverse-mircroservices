@@ -21,11 +21,14 @@ export const authRepository = {
         return prisma.session.findMany({ where: { userId } });
     },
     async findSessionById(id: string) {
-        prisma.session.findUnique({ where: { id } });
+        return prisma.session.findUnique({ where: { id } });
     },
 
+    async updateSession(id: string, update: Prisma.SessionUpdateInput) {
+        return prisma.session.update({ where: { id }, data: update });
+    },
     async deleteSession(id: string) {
-        prisma.session.delete({ where: { id } });
+        return prisma.session.delete({ where: { id } });
     },
 
     async deleteAllUserSessions(userId: string) {
