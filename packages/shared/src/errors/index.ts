@@ -25,3 +25,10 @@ export class ValidationError extends AppError {
         super(message, 400);
     }
 }
+
+export interface SerializedError {
+    statusCode: number;
+    message: string;
+    isOperational: boolean;
+    details?: unknown;
+}

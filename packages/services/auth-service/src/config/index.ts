@@ -1,4 +1,7 @@
 import type { StringValue } from 'ms';
+import dotenv from 'dotenv';
+
+dotenv.config();
 const requiredEnvVars = ['DATABASE_URL', 'ACCESS_TOKEN_JWT_SECRET'] as const;
 
 for (const envVar of requiredEnvVars) {
@@ -21,5 +24,9 @@ export const config = {
     },
     rabbitmq: {
         url: process.env.RABBITMQ_URL || 'amqp://localhost:5672',
+    },
+    cookie: {
+        secret: process.env.COOKIE_SIGN_SECRET! || 'secret',
+        options: { httpOnly: true, sameSite: 'strict', secure: process.env.nodeEnv === 'production', path: '/' },
     },
 } as const;

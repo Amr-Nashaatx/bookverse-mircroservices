@@ -3,7 +3,9 @@
     "version": "1.0.0",
     "description": "",
     "scripts": {
-        "test": "echo \"Error: no test specified\" && exit 1"
+        "dev": "tsx watch src/index.ts",
+        "build": "tsc",
+        "start": "node dist/index.js"
     },
     "keywords": [],
     "author": "Amr Nashaat",
@@ -15,16 +17,21 @@
         "@fastify/helmet": "^13.0.2",
         "@fastify/jwt": "^10.1.0",
         "@fastify/sensible": "^6.0.4",
+        "@fastify/type-provider-typebox": "^6.1.0",
+        "@prisma/adapter-pg": "^7.8.0",
         "@prisma/client": "^7.8.0",
+        "@sinclair/typebox": "^0.34.49",
         "bcryptjs": "^3.0.3",
         "dotenv": "^17.4.2",
         "fastify": "^5.8.5",
         "jsonwebtoken": "^9.0.3",
+        "pg": "^8.21.0",
         "prisma": "^7.8.0"
     },
     "devDependencies": {
         "@types/bcryptjs": "^2.4.6",
         "@types/jsonwebtoken": "^9.0.10",
+        "@types/pg": "^8.20.0",
         "tsx": "^4.22.3",
         "typescript": "^6.0.3"
     }

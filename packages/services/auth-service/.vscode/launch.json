@@ -1,0 +1,15 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Debug TypeScript (tsx)",
+            "type": "node",
+            "request": "launch",
+            "runtimeExecutable": "npx",
+            "runtimeArgs": ["tsx"],
+            "program": "${workspaceFolder}/src/index.ts",
+            "skipFiles": ["<node_internals>/**"],
+            "console": "integratedTerminal"
+        }
+    ]
+}

@@ -2,7 +2,10 @@
     "name": "bookverse",
     "private": true,
     "scripts": {
-        "compose": "docker compose --env-file .env.dev up -d"
+        "compose": "docker compose --env-file .env.dev up -d",
+        "dev:auth": "npm run dev -w @bookverse/auth-service",
+        "dev:shared": "npm run dev -w @bookverse/shared",
+        "build:shared": "npm run build -w @bookverse/shared"
     },
     "workspaces": [
         "packages/shared",

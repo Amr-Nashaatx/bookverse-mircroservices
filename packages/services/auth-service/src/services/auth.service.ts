@@ -7,12 +7,15 @@ import bcrypt from 'bcryptjs';
 
 dotenv.config();
 
-type AuthResponse = {
+export type AuthResponse = {
     user: {
         id: string;
         email: string;
         name: string;
         role: string;
+    };
+    session: {
+        id: string;
     };
     tokens: {
         accessToken: string;
@@ -57,9 +60,9 @@ export const authService = {
         /*
             create session for user with hashed refresh token
         */
-        await authRepository.createSession({
+        const { id: sessionId } = await authRepository.createSession({
             user: { connect: { id: user.id } },
-            expiresAt: new Date(config.session.expiresIn),
+            expiresAt: new Date(Date.now() + config.session.expiresIn),
             createdAt: new Date(),
             refreshTokenHash,
         });
@@ -70,6 +73,9 @@ export const authService = {
                 email: user.email,
                 name: user.name,
                 role: user.role,
+            },
+            session: {
+                id: sessionId,
             },
             tokens: {
                 accessToken,
@@ -101,9 +107,9 @@ export const authService = {
         /*
             create session with hashed refresh token
         */
-        await authRepository.createSession({
+        const { id: sessionId } = await authRepository.createSession({
             user: { connect: { id: user.id } },
-            expiresAt: new Date(config.session.expiresIn),
+            expiresAt: new Date(Date.now() + config.session.expiresIn),
             createdAt: new Date(),
             refreshTokenHash,
         });
@@ -114,6 +120,9 @@ export const authService = {
                 email: user.email,
                 name: user.name,
                 role: user.role,
+            },
+            session: {
+                id: sessionId,
             },
             tokens: {
                 accessToken,

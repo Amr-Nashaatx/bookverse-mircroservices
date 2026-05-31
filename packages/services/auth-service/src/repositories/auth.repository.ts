@@ -15,7 +15,7 @@ export const authRepository = {
     },
 
     async createSession(data: Prisma.SessionCreateInput) {
-        prisma.session.create({ data });
+        return prisma.session.create({ data });
     },
     async findSessionByUserId(userId: string) {
         return prisma.session.findMany({ where: { userId } });

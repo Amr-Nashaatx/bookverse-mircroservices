@@ -1,11 +1,26 @@
 {
-  "name": "@bookverse/gateway",
-  "version": "1.0.0",
-  "description": "",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
-  "keywords": [],
-  "author": "Amr Nashaat",
-  "type": "module"
+    "name": "@bookverse/gateway",
+    "version": "1.0.0",
+    "description": "",
+    "scripts": {
+        "dev": "tsx watch src/index.ts",
+        "build": "tsc",
+        "start": "node dist/index.js"
+    },
+    "keywords": [],
+    "author": "Amr Nashaat",
+    "type": "module",
+    "dependencies": {
+        "@bookverse/shared": "^1.0.0",
+        "@fastify/cookie": "^11.0.2",
+        "@fastify/cors": "^11.2.0",
+        "@fastify/helmet": "^13.0.2",
+        "@fastify/http-proxy": "^11.4.4",
+        "dotenv": "^17.4.2",
+        "fastify": "^5.8.5",
+        "jsonwebtoken": "^9.0.3"
+    },
+    "devDependencies": {
+        "@types/jsonwebtoken": "^9.0.10"
+    }
 }

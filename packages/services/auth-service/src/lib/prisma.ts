@@ -1,5 +1,9 @@
 import { PrismaClient } from '../generated/prisma/index.js';
+import { PrismaPg } from '@prisma/adapter-pg';
+import { config } from '../config/index.js';
 
-const prisma = new PrismaClient();
+const adapter = new PrismaPg({
+    connectionString: config.db.url,
+});
 
-export default prisma;
+export default new PrismaClient({ adapter });
