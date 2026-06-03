@@ -16,6 +16,13 @@ fastify.register(fastifyCors);
 fastify.register(fastifyHttpProxy, {
     upstream: config.services.auth,
     prefix: '/auth',
+    replyOptions: {
+        rewriteRequestHeaders: (request, headers) => {
+            const { expect, ...rest } = headers;
+
+            return rest;
+        },
+    },
 });
 
 // Proxies Protected
@@ -50,7 +57,7 @@ process.on('uncaughtException', (error) => {
 });
 
 // Run server
-fastify.listen({ port: config.port }, (err) => {
+fastify.listen({ port: config.port, host: '0.0.0.0' }, (err) => {
     if (err) {
         fastify.log.error(err);
         process.exit(1);

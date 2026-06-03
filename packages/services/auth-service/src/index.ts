@@ -18,6 +18,11 @@ fastify.register(fastifyHelmet);
 fastify.register(fastifyCors);
 fastify.register(fastifyCookie, { secret: config.cookie.secret });
 
+// Health check
+fastify.get('/health', async (request, reply) => {
+    return reply.send({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
 // Routes
 fastify.register(authRoutes, { prefix: '/auth' });
 
@@ -43,7 +48,7 @@ process.on('uncaughtException', (error) => {
     process.exit(1);
 });
 
-fastify.listen({ port: config.port }, (err) => {
+fastify.listen({ port: config.port, host: '0.0.0.0' }, (err) => {
     if (err) {
         fastify.log.error(err);
         process.exit(1);
