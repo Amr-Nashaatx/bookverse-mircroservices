@@ -2,10 +2,17 @@
     "name": "bookverse",
     "private": true,
     "scripts": {
-        "compose": "docker compose --env-file .env.dev up -d",
+        "compose": "docker compose --env-file .env.dev up",
         "dev:auth": "npm run dev -w @bookverse/auth-service",
         "dev:shared": "npm run dev -w @bookverse/shared",
-        "build:shared": "npm run build -w @bookverse/shared"
+        "build:shared": "npm run build -w @bookverse/shared",
+        "dev:container:gateway": "npm install && nodemon -L --watch packages/gateway/src --watch packages/shared/src --ext ts,js,json --signal SIGTERM --exec \"npm run dev:container:gateway:exec\"",
+        "dev:container:gateway:exec": "npm run build:shared && node --inspect=0.0.0.0:9229 --import tsx packages/gateway/src/index.ts",
+        "dev:container:auth": "npm install && nodemon -L --watch packages/services/auth-service/src --watch packages/shared/src --ext ts,js,json --signal SIGTERM --exec \"npm run dev:container:auth:exec\"",
+        "dev:container:auth:exec": "npm run build:shared && node --inspect=0.0.0.0:9230 --import tsx packages/services/auth-service/src/index.ts"
+    },
+    "devDependencies": {
+        "nodemon": "^3.1.10"
     },
     "workspaces": [
         "packages/shared",
