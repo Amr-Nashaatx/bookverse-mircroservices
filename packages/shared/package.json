@@ -16,5 +16,8 @@
     },
     "keywords": [],
     "author": "Amr Nashaat",
-    "type": "module"
+    "type": "module",
+    "devDependencies": {
+        "typescript": "^6.0.3"
+    }
 }
