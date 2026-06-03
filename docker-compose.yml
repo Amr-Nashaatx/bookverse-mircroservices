@@ -4,7 +4,7 @@ services:
         restart: always
         container_name: postgres
         env_file:
-            - .env.dev
+            - ./.env.dev
         environment:
             POSTGRES_PASSWORD: ${DB_PASSWORD}
         volumes:
@@ -17,12 +17,14 @@ services:
             interval: 5s
             timeout: 5s
             retries: 5
+        networks:
+            - bookverse
     rabbitmq:
         image: rabbitmq:3-management
         restart: always
         container_name: rabbitmq
         env_file:
-            - .env.dev
+            - ./.env.dev
         environment:
             RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER}
             RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS}
@@ -36,6 +38,8 @@ services:
             interval: 30s
             timeout: 10s
             retries: 3
+        networks:
+            - bookverse
     redis:
         image: redis:7-alpine
         restart: always
@@ -49,8 +53,63 @@ services:
             interval: 10s
             timeout: 5s
             retries: 5
+        networks:
+            - bookverse
+    auth-service:
+        build:
+            context: .
+            dockerfile: packages/services/auth-service/Dockerfile
+        restart: always
+        container_name: auth-service
+        env_file:
+            - ./.env.dev
+        environment:
+            NODE_ENV: ${NODE_ENV:-development}
+            PORT: 3001
+        depends_on:
+            postgres:
+                condition: service_healthy
+            rabbitmq:
+                condition: service_healthy
+            redis:
+                condition: service_healthy
+        healthcheck:
+            test: ['CMD', 'wget', '--quiet', '--tries=1', '--spider', 'http://127.0.0.1:3001/health']
+            interval: 10s
+            timeout: 5s
+            retries: 5
+        networks:
+            - bookverse
+    gateway:
+        build:
+            context: .
+            dockerfile: packages/gateway/Dockerfile
+        restart: always
+        container_name: gateway
+        env_file:
+            - ./.env.dev
+        environment:
+            NODE_ENV: ${NODE_ENV:-development}
+            PORT: 3000
+            AUTH_SERVICE_URL: http://auth-service:3001/auth
+        ports:
+            - '3000:3000'
+        depends_on:
+            auth-service:
+                condition: service_healthy
+        healthcheck:
+            test: ['CMD', 'wget', '--quiet', '--tries=1', '--spider', 'http://127.0.0.1:3000/health']
+            interval: 10s
+            timeout: 5s
+            retries: 5
+        networks:
+            - bookverse
 
 volumes:
     postgres_data:
     rabbitmq_data:
     redis_data:
+
+networks:
+    bookverse:
+        driver: bridge
