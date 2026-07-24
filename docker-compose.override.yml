@@ -24,3 +24,15 @@ services:
             NODE_ENV: development
         ports:
             - '9230:9230'
+    book-service:
+        env_file:
+            - .env.dev
+        working_dir: /app
+        volumes:
+            - ./packages/services/book-service/src:/app/packages/services/book-service/src
+            - ./packages/shared/src:/app/packages/shared/src
+        command: ['npm', 'run', 'dev:container:book']
+        environment:
+            NODE_ENV: development
+        ports:
+            - '9231:9231'

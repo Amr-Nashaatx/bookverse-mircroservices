@@ -1,0 +1,30 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Book {
+  id            String     @id @default(uuid())
+  title         String
+  // The user who created the book. Ownership checks compare this to request.user.id.
+  authorId      String
+  genre         String[]
+  description   String
+  coverImageUrl String?
+  status        BookStatus @default(DRAFT)
+  publishedAt   DateTime?
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  @@index([authorId])
+}
+
+enum BookStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
