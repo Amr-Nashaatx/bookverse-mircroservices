@@ -18,6 +18,10 @@
     "author": "Amr Nashaat",
     "type": "module",
     "devDependencies": {
+        "@types/node": "^24.0.0",
         "typescript": "^6.0.3"
+    },
+    "dependencies": {
+        "fastify": "^5.10.0"
     }
 }

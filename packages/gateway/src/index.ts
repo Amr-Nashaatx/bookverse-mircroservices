@@ -3,24 +3,31 @@ import fastifyHlemt from '@fastify/helmet';
 import fastifyCors from '@fastify/cors';
 import fastifyHttpProxy from '@fastify/http-proxy';
 
+import { globalErrorHandler } from '@bookverse/shared';
 // Local imports
 import { config } from './config/index.js';
 import { verifyJwt } from './plugins/verify-jwt.js';
+
+// Utils
+import { stripHeaders } from './utils/requestHeadersUtils.js';
 
 // Third-party plugins
 const fastify = Fastify({ logger: true });
 fastify.register(fastifyHlemt);
 fastify.register(fastifyCors);
 
+fastify.setErrorHandler(globalErrorHandler);
 // Proxies Public
+fastify.decorateRequest('user', null as any);
 fastify.register(fastifyHttpProxy, {
     upstream: config.services.auth,
     prefix: '/auth',
     replyOptions: {
-        rewriteRequestHeaders: (request, headers) => {
-            const { expect, ...rest } = headers;
+        rewriteRequestHeaders: (_request, headers) => {
+            let strippedHeaders = stripHeaders(headers);
 
-            return rest;
+            strippedHeaders['x-gateway-secret'] = config.secrets.gatewaySecret;
+            return strippedHeaders;
         },
     },
 });

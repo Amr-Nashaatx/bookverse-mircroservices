@@ -1,0 +1,53 @@
+### BookVerse — manual API tests
+### Requires the "REST Client" VS Code extension (or Thunder Client / Bruno).
+### Click "Send Request" above each block. Cookies are stored & resent automatically.
+
+@baseUrl = http://localhost:3000
+@email = amr@example.com
+@password = password123
+
+### 1. Gateway health (no auth)
+GET {{baseUrl}}/health
+
+### 2. Signup (through the gateway) — sets sessionId + refreshToken cookies
+# @name signup
+POST {{baseUrl}}/auth/signup
+Content-Type: application/json
+
+{
+  "name": "Amr Nashaat",
+  "email": "{{email}}",
+  "password": "{{password}}"
+}
+
+### 3. Login — capture the access token for protected calls below
+# @name login
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{email}}",
+  "password": "{{password}}"
+}
+
+### grab the token out of the login response
+@accessToken = {{login.response.body.data.tokens.accessToken}}
+
+### 4. Example PROTECTED call (once the Book service exists)
+###    The gateway verifies this token and injects x-user-* downstream.
+GET {{baseUrl}}/books
+Authorization: Bearer {{accessToken}}
+
+### 5. Refresh — uses the sessionId + refreshToken cookies automatically
+POST {{baseUrl}}/auth/refresh
+
+### 6. Logout — clears the session
+POST {{baseUrl}}/auth/logout
+
+### ---------------------------------------------------------------
+### NEGATIVE TEST (run in a terminal, not here — auth-service isn't
+### reachable from the host). Bypassing the gateway with no secret → 401:
+###
+###   docker compose exec -T gateway wget -S -O- --post-data='{}' \
+###     --header='Content-Type: application/json' \
+###     http://auth-service:3001/auth/login 2>&1 | head

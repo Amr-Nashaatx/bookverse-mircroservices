@@ -41,5 +41,5 @@ WORKDIR /app/packages/services/auth-service
 
 EXPOSE 3001
 
-# Run Prisma migrations and start the service
-CMD ["sh", "-c", "npm run prisma:migrate:deploy && npm start"]
+# Start the service. Run migrations manually with `npm run migrate:auth` from the repo root.
+CMD ["npm", "start"]

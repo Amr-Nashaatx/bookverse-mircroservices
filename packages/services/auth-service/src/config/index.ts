@@ -2,7 +2,7 @@ import type { StringValue } from 'ms';
 import dotenv from 'dotenv';
 
 dotenv.config();
-const requiredEnvVars = ['AUTH_SERVICE_DATABASE_URL', 'ACCESS_TOKEN_JWT_SECRET'] as const;
+const requiredEnvVars = ['AUTH_SERVICE_DATABASE_URL', 'ACCESS_TOKEN_JWT_SECRET', 'GATEWAY_ACCEPTED_SECRETS'] as const;
 
 for (const envVar of requiredEnvVars) {
     if (!process.env[envVar]) {
@@ -32,5 +32,11 @@ export const config = {
     cookie: {
         secret: process.env.COOKIE_SIGN_SECRET! || 'secret',
         options: { httpOnly: true, sameSite: 'strict', secure: process.env.nodeEnv === 'production', path: '/' },
+    },
+    gateway: {
+        secrets: process.env
+            .GATEWAY_ACCEPTED_SECRETS!.split(',')
+            .map((s) => s.trim())
+            .filter(Boolean),
     },
 } as const;

@@ -4,12 +4,14 @@ import fastifyCookie from '@fastify/cookie';
 import fastifyHelmet from '@fastify/helmet';
 import fastifyCors from '@fastify/cors';
 import { TypeBoxTypeProvider } from '@fastify/type-provider-typebox';
-
 // routes
 import { authRoutes } from './routes/auth.routes.js';
 
 import { config } from './config/index.js';
-import { globalErrorHandler } from './errors/error-handler.js';
+import { globalErrorHandler } from '@bookverse/shared';
+
+// Plugins
+import { makeVerifyGatewaySecret } from '@bookverse/shared';
 
 const fastify = Fastify({ logger: true }).withTypeProvider<TypeBoxTypeProvider>();
 
@@ -17,17 +19,16 @@ const fastify = Fastify({ logger: true }).withTypeProvider<TypeBoxTypeProvider>(
 fastify.register(fastifyHelmet);
 fastify.register(fastifyCors);
 fastify.register(fastifyCookie, { secret: config.cookie.secret });
-
 // Health check
 fastify.get('/health', async (request, reply) => {
     return reply.send({ status: 'ok', timestamp: new Date().toISOString() });
 });
-
-// Routes
-fastify.register(authRoutes, { prefix: '/auth' });
-
-// Error Handler
 fastify.setErrorHandler(globalErrorHandler);
+
+fastify.register(async (secured) => {
+    secured.addHook('preHandler', makeVerifyGatewaySecret(config.gateway.secrets));
+    secured.register(authRoutes, { prefix: '/auth' });
+});
 
 // Graceful Shutdown
 const shutdown = async () => {

@@ -32,3 +32,6 @@ export interface SerializedError {
     isOperational: boolean;
     details?: unknown;
 }
+
+export * from './error-handler.js';
+export * from './error-serializer.js';

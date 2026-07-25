@@ -1,6 +1,5 @@
 import { FastifyError } from 'fastify';
-import { AppError } from '@bookverse/shared';
-import { SerializedError } from '@bookverse/shared';
+import { AppError, SerializedError } from './index.js';
 
 export function serializeError(error: unknown): SerializedError {
     // AppError
