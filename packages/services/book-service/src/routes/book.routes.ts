@@ -1,6 +1,14 @@
-import { ApiResponse } from '@bookverse/shared';
+import { ApiResponse, authenticateUser, ForbiddenError, UnauthorizedError } from '@bookverse/shared';
 import { bookService } from '../services/book.service.js';
-import { BookListResponseSchema, BookResponseSchema } from '../schemas/book.schemas.js';
+import {
+    BookListResponseSchema,
+    BookResponseSchema,
+    CreateBookInput,
+    UpdateBookInput,
+    UpdateBookSchema,
+    CreateBookSchema,
+    UpdateBookParamsSchema,
+} from '../schemas/book.schemas.js';
 import { FastifyTypeboxInstance } from '../types/fastify.js';
 
 export async function bookRoutes(fastify: FastifyTypeboxInstance) {
@@ -48,4 +56,36 @@ export async function bookRoutes(fastify: FastifyTypeboxInstance) {
     // You'll also register `authenticateUser`'s Fastify type augmentation
     // (declare module 'fastify' { interface FastifyRequest { user?: {...} } }).
     // ─────────────────────────────────────────────────────────────────────────
+
+    fastify.post(
+        '/',
+        { preHandler: authenticateUser, schema: { response: { 201: BookResponseSchema }, body: CreateBookSchema } },
+        async (request, reply) => {
+            const authorId = request.user!.id;
+            const bookData = request.body as CreateBookInput;
+
+            const created = await bookService.createBook(authorId, bookData);
+            reply.status(201).send(new ApiResponse('Book created', created));
+        },
+    );
+
+    fastify.patch(
+        '/:id',
+        {
+            preHandler: authenticateUser,
+            schema: { response: { 200: BookResponseSchema }, body: UpdateBookSchema, params: UpdateBookParamsSchema },
+        },
+        async (request, reply) => {
+            const authorId = request.user!.id;
+            const { id: bookId } = request.params as { id: string };
+            const bookUpdateData = request.body as UpdateBookInput;
+
+            // ownership check
+            const book = await bookService.getBook(bookId);
+            if (book.authorId !== authorId) throw new ForbiddenError('You do not have permission for this action');
+
+            const updated = await bookService.updateBook(bookId, bookUpdateData);
+            reply.send(new ApiResponse('Book updated'));
+        },
+    );
 }

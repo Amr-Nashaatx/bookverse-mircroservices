@@ -117,6 +117,7 @@ services:
             NODE_ENV: ${NODE_ENV:-development}
             PORT: 3000
             AUTH_SERVICE_URL: http://auth-service:3001/auth
+            BOOK_SERVICE_URL: http://book-service:3002/books
         ports:
             - '3000:3000'
         depends_on:

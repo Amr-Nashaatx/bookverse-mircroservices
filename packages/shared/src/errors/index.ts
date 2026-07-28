@@ -26,6 +26,11 @@ export class ValidationError extends AppError {
     }
 }
 
+export class ForbiddenError extends AppError {
+    constructor(message = 'Forbidden') {
+        super(message, 403);
+    }
+}
 export interface SerializedError {
     statusCode: number;
     message: string;

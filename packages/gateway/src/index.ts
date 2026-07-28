@@ -1,4 +1,4 @@
-import Fastify from 'fastify';
+import Fastify, { FastifyRequest } from 'fastify';
 import fastifyHlemt from '@fastify/helmet';
 import fastifyCors from '@fastify/cors';
 import fastifyHttpProxy from '@fastify/http-proxy';
@@ -9,7 +9,9 @@ import { config } from './config/index.js';
 import { verifyJwt } from './plugins/verify-jwt.js';
 
 // Utils
-import { stripHeaders } from './utils/requestHeadersUtils.js';
+import { stripHeaders, withUserAndSecret } from './utils/requestHeadersUtils.js';
+import fastifyCookie from '@fastify/cookie';
+import { bookServiceProxy } from './proxies/bookServiceProxy.js';
 
 // Third-party plugins
 const fastify = Fastify({ logger: true });
@@ -34,8 +36,7 @@ fastify.register(fastifyHttpProxy, {
 
 // Proxies Protected
 fastify.register(async (fastify) => {
-    fastify.addHook('preHandler', verifyJwt);
-
+    fastify.register(fastifyHttpProxy, bookServiceProxy);
     // other services later...
 });
 

@@ -33,20 +33,126 @@ Content-Type: application/json
 ### grab the token out of the login response
 @accessToken = {{login.response.body.data.tokens.accessToken}}
 
-### 4. Example PROTECTED call (once the Book service exists)
-###    The gateway verifies this token and injects x-user-* downstream.
+### ================================================================
+### BOOK SERVICE
+### ================================================================
+
+### 4a. GET /books — PUBLIC (no token). Reads are open at the gateway. → 200
 GET {{baseUrl}}/books
+
+### 4b. POST /books — PROTECTED, valid token (matrix row 1). → 201
+###     Gateway verifies the JWT and injects x-user-* downstream.
+# @name createBook
+POST {{baseUrl}}/books
 Authorization: Bearer {{accessToken}}
+Content-Type: application/json
 
-### 5. Refresh — uses the sessionId + refreshToken cookies automatically
-POST {{baseUrl}}/auth/refresh
+{
+  "title": "Distributed Systems for Skeptics",
+  "description": "A field guide to partial failure.",
+  "genre": ["non-fiction", "engineering"]
+}
 
-### 6. Logout — clears the session
-POST {{baseUrl}}/auth/logout
+### capture the new book's id + its owner
+@bookId = {{createBook.response.body.data.id}}
+@bookOwnerId = {{createBook.response.body.data.authorId}}
+
+### 4c. GET /books/:id — PUBLIC. → 200
+GET {{baseUrl}}/books/{{bookId}}
+
+### 4d. PATCH /books/:id — OWNER updating own book. → 200
+PATCH {{baseUrl}}/books/{{bookId}}
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "title": "Distributed Systems for Skeptics (2nd ed.)"
+}
+
+### 5. POST /books — PROTECTED, NO token (matrix row 2). → 401 at the GATEWAY
+###    verifyJwt rejects before the request ever reaches book-service.
+POST {{baseUrl}}/books
+Content-Type: application/json
+
+{
+  "title": "Should never be created",
+  "description": "no token",
+  "genre": []
+}
 
 ### ---------------------------------------------------------------
-### NEGATIVE TEST (run in a terminal, not here — auth-service isn't
-### reachable from the host). Bypassing the gateway with no secret → 401:
+### 6. OWNERSHIP (fine-grained authz) — a DIFFERENT user tries to edit
+###    the first user's book. → 403 (ForbiddenError). Authenticated, but not the owner.
+
+### 6a. Second user signup
+POST {{baseUrl}}/auth/signup
+Content-Type: application/json
+
+{
+  "name": "Mallory",
+  "email": "mallory@example.com",
+  "password": "password123"
+}
+
+### 6b. Second user login — capture their token
+# @name login2
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "mallory@example.com",
+  "password": "password123"
+}
+@accessToken2 = {{login2.response.body.data.tokens.accessToken}}
+
+### 6c. Non-owner PATCH — passes authenticateUser, fails the ownership check. → 403
+PATCH {{baseUrl}}/books/{{bookId}}
+Authorization: Bearer {{accessToken2}}
+Content-Type: application/json
+
+{
+  "title": "Hijacked title"
+}
+
+### 7. Refresh — uses the sessionId + refreshToken cookies automatically
+POST {{baseUrl}}/auth/refresh
+
+### 8. Logout — clears the session
+POST {{baseUrl}}/auth/logout
+
+### ================================================================
+### DIRECT-TO-SERVICE bypass tests (run in a TERMINAL, not here —
+### book-service is not published to the host, only on the docker net).
+### ================================================================
+###
+### Matrix row 3 — direct call, NO gateway secret → 401
+### (verifyGatewaySecret rejects before any route logic runs):
+###
+###   docker compose exec -T gateway wget -S -O- \
+###     --header='content-type: application/json' \
+###     --post-data='{"title":"Direct","description":"no secret","genre":["x"]}' \
+###     http://book-service:3002/books/ 2>&1 | head -n 20
+###
+### Matrix row 4 — direct call, CORRECT secret + FORGED identity → 201.
+### This is the lesson: the secret is the only gate, so a secret-holder is
+### anyone. Note ALL THREE identity headers are forged (authenticateUser
+### needs id+role+email); a partial forgery would 401 on validation, not auth.
+### Secret is read from the container's env — never hardcoded here.
+###
+###   docker compose exec -T gateway sh -c 'wget -S -O- \
+###     --header="content-type: application/json" \
+###     --header="x-gateway-secret: $GATEWAY_SECRET" \
+###     --header="x-user-id: 11111111-1111-1111-1111-111111111111" \
+###     --header="x-user-role: USER" \
+###     --header="x-user-email: forged@evil.test" \
+###     --post-data="{\"title\":\"Forged\",\"description\":\"minted without the gateway\",\"genre\":[\"x\"]}" \
+###     http://book-service:3002/books/' 2>&1 | head -n 30
+###
+### Then compare row 4's created authorId (11111111-…) against a real book's
+### owner from 4b. The service cannot tell them apart.
+###
+### ---------------------------------------------------------------
+### AUTH bypass (Lesson 01) — direct to auth-service with no secret → 401:
 ###
 ###   docker compose exec -T gateway wget -S -O- --post-data='{}' \
 ###     --header='Content-Type: application/json' \

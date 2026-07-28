@@ -1,7 +1,7 @@
 import { NotFoundError } from '@bookverse/shared';
 import { bookRepository } from '../repositories/book.repository.js';
 import type { Book } from '../generated/prisma/index.js';
-import type { BookData, CreateBookInput } from '../schemas/book.schemas.js';
+import type { BookData, CreateBookInput, UpdateBookInput } from '../schemas/book.schemas.js';
 
 // Shape a Prisma Book (with Date objects) into the serializable response DTO.
 function serialize(book: Book): BookData {
@@ -45,5 +45,10 @@ export const bookService = {
             authorId,
         });
         return serialize(book);
+    },
+
+    async updateBook(bookId: string, update: UpdateBookInput) {
+        const updated = await bookRepository.updateBook(bookId, update);
+        return serialize(updated);
     },
 };

@@ -13,7 +13,7 @@
         "dev:container:auth": "npm install && nodemon -L --watch packages/services/auth-service/src --watch packages/shared/src --ext ts,js,json --signal SIGTERM --exec \"npm run dev:container:auth:exec\"",
         "dev:container:auth:exec": "npm run build:shared && node --inspect=0.0.0.0:9230 --import tsx packages/services/auth-service/src/index.ts",
         "dev:container:book": "npm install && nodemon -L --watch packages/services/book-service/src --watch packages/shared/src --ext ts,js,json --signal SIGTERM --exec \"npm run dev:container:book:exec\"",
-        "dev:container:book:exec": "npm run build:shared && npm run prisma:generate -w @bookverse/book-service && node --inspect=0.0.0.0:9231 --import tsx packages/services/book-service/src/index.ts"
+        "dev:container:book:exec": "npm run build:shared && node --inspect=0.0.0.0:9231 --import tsx packages/services/book-service/src/index.ts"
     },
     "devDependencies": {
         "nodemon": "^3.1.10"

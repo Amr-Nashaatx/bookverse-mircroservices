@@ -1,5 +1,9 @@
 import { Type, Static } from '@sinclair/typebox';
 
+// Request Params Schemas
+export const UpdateBookParamsSchema = Type.Object({
+    id: Type.String({ format: 'uuid' }),
+});
 // Request Schemas
 export const CreateBookSchema = Type.Object({
     title: Type.String({ minLength: 1 }),
@@ -8,6 +12,12 @@ export const CreateBookSchema = Type.Object({
     coverImageUrl: Type.Optional(Type.String({ format: 'uri' })),
 });
 
+export const UpdateBookSchema = Type.Object({
+    title: Type.Optional(Type.String({ minLength: 1 })),
+    description: Type.Optional(Type.String({ minLength: 1 })),
+    genre: Type.Optional(Type.Array(Type.String(), { default: [] })),
+    coverImageUrl: Type.Optional(Type.Optional(Type.String({ format: 'uri' }))),
+});
 // Response Schemas
 export const BookSchema = Type.Object({
     id: Type.String({ format: 'uuid' }),
@@ -37,4 +47,5 @@ export const BookListResponseSchema = Type.Object({
 
 // Inferred types
 export type CreateBookInput = Static<typeof CreateBookSchema>;
+export type UpdateBookInput = Static<typeof UpdateBookSchema>;
 export type BookData = Static<typeof BookSchema>;

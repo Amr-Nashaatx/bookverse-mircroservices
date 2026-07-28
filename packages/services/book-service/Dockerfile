@@ -14,7 +14,11 @@ WORKDIR /app/packages/shared
 RUN npm install
 RUN npm run build
 
-# Install and build the book service (build runs `prisma generate && tsc`)
+# Install and build the book service (`npm run build` = tsc).
+# The Prisma client is generated on the host and copied in via the build context
+# (mirrors auth-service). We do NOT run `prisma generate` in the image: it's a
+# portable WASM client (pg driver adapter), so the host-generated output runs here,
+# and prisma generate is unreliable on this Linux/Node image anyway.
 WORKDIR /app/packages/services/book-service
 RUN npm install
 RUN npm run build
