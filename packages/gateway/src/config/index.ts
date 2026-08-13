@@ -20,5 +20,9 @@ export const config = {
     services: {
         auth: process.env.AUTH_SERVICE_URL || 'http://localhost:3001/auth',
         book: process.env.BOOK_SERVICE_URL || 'http://localhost:3002/books',
+        timeouts: {
+            auth: 2000,
+            book: 1000,
+        },
     },
 };

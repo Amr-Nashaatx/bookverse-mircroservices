@@ -6,12 +6,9 @@ import fastifyHttpProxy from '@fastify/http-proxy';
 import { globalErrorHandler } from '@bookverse/shared';
 // Local imports
 import { config } from './config/index.js';
-import { verifyJwt } from './plugins/verify-jwt.js';
-
 // Utils
-import { stripHeaders, withUserAndSecret } from './utils/requestHeadersUtils.js';
-import fastifyCookie from '@fastify/cookie';
 import { bookServiceProxy } from './proxies/bookServiceProxy.js';
+import { authServiceProxy } from './proxies/authServiceProxy.js';
 
 // Third-party plugins
 const fastify = Fastify({ logger: true });
@@ -21,18 +18,7 @@ fastify.register(fastifyCors);
 fastify.setErrorHandler(globalErrorHandler);
 // Proxies Public
 fastify.decorateRequest('user', null as any);
-fastify.register(fastifyHttpProxy, {
-    upstream: config.services.auth,
-    prefix: '/auth',
-    replyOptions: {
-        rewriteRequestHeaders: (_request, headers) => {
-            let strippedHeaders = stripHeaders(headers);
-
-            strippedHeaders['x-gateway-secret'] = config.secrets.gatewaySecret;
-            return strippedHeaders;
-        },
-    },
-});
+fastify.register(fastifyHttpProxy, authServiceProxy);
 
 // Proxies Protected
 fastify.register(async (fastify) => {

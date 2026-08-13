@@ -14,11 +14,13 @@ export const bookServiceProxy = {
         rewriteRequestHeaders(request, headers) {
             // Identity is conditional (only on protected routes), but the gateway
             // secret is UNCONDITIONAL — every service call must prove it came from
-            // the gateway, public routes included (Lesson 01).
+            // the gateway, public routes included
             if (request.user) return withUserAndSecret(request as unknown as FastifyRequest, headers);
             const stripped = stripHeaders(headers);
             stripped['x-gateway-secret'] = config.secrets.gatewaySecret;
             return stripped;
         },
+        timeout: 2000,
+        // timeout: config.services.timeouts.book,
     },
 } satisfies FastifyHttpProxyOptions;
