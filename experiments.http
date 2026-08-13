@@ -1,0 +1,44 @@
+@baseUrl = http://localhost:3000
+@email = amr@example.com
+@password = password123
+
+### 1. Gateway health (no auth)
+GET {{baseUrl}}/health
+
+### 2. Signup (through the gateway) — sets sessionId + refreshToken cookies
+# @name signup
+POST {{baseUrl}}/auth/signup
+Content-Type: application/json
+
+{
+  "name": "Amr Nashaat",
+  "email": "{{email}}",
+  "password": "{{password}}"
+}
+
+### 3. Login — capture the access token for protected calls below
+# @name login
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{email}}",
+  "password": "{{password}}"
+}
+
+### 4a. GET /books — PUBLIC (no token). Reads are open at the gateway. → 200
+GET {{baseUrl}}/books
+
+### grab the token out of the login response
+@accessToken = {{login.response.body.data.tokens.accessToken}}
+
+POST {{baseUrl}}/books
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+x-fault-delay: 8000
+
+{
+  "title": "Experiment B Test Book",
+  "description": "A field guide to partial failure.",
+  "genre": ["non-fiction", "engineering"]
+}
