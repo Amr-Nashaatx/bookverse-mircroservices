@@ -31,6 +31,12 @@ export class ForbiddenError extends AppError {
         super(message, 403);
     }
 }
+
+export class ConflictError extends AppError {
+    constructor(message = 'Conflict') {
+        super(message, 409);
+    }
+}
 export interface SerializedError {
     statusCode: number;
     message: string;
