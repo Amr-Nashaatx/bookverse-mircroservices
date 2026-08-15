@@ -1,22 +1,32 @@
+### BookVerse — Lesson 03 experiments: partial failure & idempotency
+### Requires the "REST Client" VS Code extension. Run top to bottom.
+###
+### IMPORTANT: idempotency keys are permanent. Once a key is used it stays used,
+### so re-running this file with the same keys replays instead of creating.
+### Bump @run before each fresh pass.
+
 @baseUrl = http://localhost:3000
 @email = amr@example.com
-@password = password123
+@password = password123 
 
-### 1. Gateway health (no auth)
+### ⬇⬇ BUMP THIS BEFORE EACH FULL RE-RUN ⬇⬇
+@run = 1
+
+@keyReplay   = replay-{{run}}
+@keyDistinctA = distinct-a-{{run}}
+@keyDistinctB = distinct-b-{{run}}
+@keyTimeout  = timeout-{{run}}
+@keyBugFirst = clientbug-first-{{run}}
+@keyBugRetry = clientbug-retry-{{run}}
+
+### ============================================================
+### SETUP
+### ============================================================
+
+### S1. Gateway health
 GET {{baseUrl}}/health
 
-### 2. Signup (through the gateway) — sets sessionId + refreshToken cookies
-# @name signup
-POST {{baseUrl}}/auth/signup
-Content-Type: application/json
-
-{
-  "name": "Amr Nashaat",
-  "email": "{{email}}",
-  "password": "{{password}}"
-}
-
-### 3. Login — capture the access token for protected calls below
+### S2. Login — capture the access token
 # @name login
 POST {{baseUrl}}/auth/login
 Content-Type: application/json
@@ -26,19 +36,210 @@ Content-Type: application/json
   "password": "{{password}}"
 }
 
-### 4a. GET /books — PUBLIC (no token). Reads are open at the gateway. → 200
+### Grab the token out of the login response (needs its own ### block —
+### a bare @var line after a body is parsed AS part of that body)
+@accessToken = {{login.response.body.data.tokens.accessToken}}
+
+### S3. Baseline — how many books exist right now?
 GET {{baseUrl}}/books
 
-### grab the token out of the login response
-@accessToken = {{login.response.body.data.tokens.accessToken}}
+
+### ============================================================
+### TEST 1 — Replay: same key, same body, twice
+### EXPECT: 201 both times, IDENTICAL book id. Only one book created.
+### ============================================================
+
+### 1a. First create
+# @name t1a
+POST {{baseUrl}}/books
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+Idempotency-Key: {{keyReplay}}
+
+{
+  "title": "T1 Replay Probe",
+  "description": "same key, same body",
+  "genre": ["test"]
+}
+
+### 1b. Send it again, unchanged. → 201 with the SAME id as 1a
+###     Compare against: {{t1a.response.body.data.id}}
+POST {{baseUrl}}/books
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+Idempotency-Key: {{keyReplay}}
+
+{
+  "title": "T1 Replay Probe",
+  "description": "same key, same body",
+  "genre": ["test"]
+}
+
+
+### ============================================================
+### TEST 2 — Fingerprint mismatch: same key, DIFFERENT body
+### EXPECT: 409 Conflict. The client reused a key for a new intent.
+### ============================================================
+
+### 2a. Reuse keyReplay with a different title
+POST {{baseUrl}}/books
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+Idempotency-Key: {{keyReplay}}
+
+{
+  "title": "T2 Different Title",
+  "description": "same key, same body",
+  "genre": ["test"]
+}
+
+### 2b. Same key, same fields, DIFFERENT key ORDER in the JSON.
+###     EXPECT: 201 replay, not 409 — the hash sorts keys before hashing.
+###     If this 409s, canonicalization is broken.
+POST {{baseUrl}}/books
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+Idempotency-Key: {{keyReplay}}
+
+{
+  "genre": ["test"],
+  "description": "same key, same body",
+  "title": "T1 Replay Probe"
+}
+
+
+### ============================================================
+### TEST 3 — Different keys, same body → TWO books
+### EXPECT: two 201s with DIFFERENT ids. Catches over-aggressive dedupe:
+### a user may legitimately create two identical books.
+### ============================================================
+
+### 3a.
+# @name t3a
+POST {{baseUrl}}/books
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+Idempotency-Key: {{keyDistinctA}}
+
+{
+  "title": "T3 Duplicate Allowed",
+  "description": "different keys, same body",
+  "genre": ["test"]
+}
+
+### 3b. Different key, identical body. → 201, id DIFFERENT from {{t3a.response.body.data.id}}
+POST {{baseUrl}}/books
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+Idempotency-Key: {{keyDistinctB}}
+
+{
+  "title": "T3 Duplicate Allowed",
+  "description": "different keys, same body",
+  "genre": ["test"]
+}
+
+
+### ============================================================
+### TEST 4 — THE ONE THAT MATTERS
+### Gateway times out (1s) while book-service keeps working (8s fault).
+### The client retries with the SAME key.
+### EXPECT: 4a → 504.  4b → 201 with the book 4a created.  ONE book total.
+### ============================================================
+
+### 4a. Fault-inject 8s. Gateway gives up at 1s → 504.
+###     The write still commits ~7s later. You were told it failed. It didn't.
+POST {{baseUrl}}/books
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+Idempotency-Key: {{keyTimeout}}
+x-fault-delay: 8000
+
+{
+  "title": "T4 Timeout Then Retry",
+  "description": "the payoff",
+  "genre": ["test"]
+}
+
+### 4b. >>> WAIT ~10 SECONDS <<< then retry with the same key, no fault.
+###     EXPECT 201 and a book id — the one 4a silently created.
+POST {{baseUrl}}/books
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+Idempotency-Key: {{keyTimeout}}
+
+{
+  "title": "T4 Timeout Then Retry",
+  "description": "the payoff",
+  "genre": ["test"]
+}
+
+### 4c. Count them. EXPECT exactly ONE "T4 Timeout Then Retry".
+GET {{baseUrl}}/books
+
+
+### ============================================================
+### TEST 5 — The client bug this protects against
+### A client that generates a NEW key per HTTP request instead of per
+### INTENT gets no protection at all.
+### EXPECT: 5a → 504, 5b → 201, and TWO books. The duplicate is back.
+### ============================================================
+
+### 5a. Fault-inject, times out.
+POST {{baseUrl}}/books
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+Idempotency-Key: {{keyBugFirst}}
+x-fault-delay: 8000
+
+{
+  "title": "T5 Duplicate Returns",
+  "description": "new key per retry",
+  "genre": ["test"]
+}
+
+### 5b. >>> WAIT ~10 SECONDS <<< retry, but with a FRESH key (the bug).
+POST {{baseUrl}}/books
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+Idempotency-Key: {{keyBugRetry}}
+
+{
+  "title": "T5 Duplicate Returns",
+  "description": "new key per retry",
+  "genre": ["test"]
+}
+
+### 5c. EXPECT TWO "T5 Duplicate Returns". The key must identify the
+###     INTENT, not the request.
+GET {{baseUrl}}/books
+
+
+### ============================================================
+### TEST 6 — Missing key
+### EXPECT: 400. You made the key required; this is that decision.
+### ============================================================
 
 POST {{baseUrl}}/books
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
-x-fault-delay: 8000
 
 {
-  "title": "Experiment B Test Book",
-  "description": "A field guide to partial failure.",
-  "genre": ["non-fiction", "engineering"]
+  "title": "T6 No Key",
+  "description": "should be rejected",
+  "genre": ["test"]
 }
+
+
+### ============================================================
+### NOTES / RESULTS  (fill in as you run)
+### ============================================================
+### T1b  same id as T1a?        → yes
+### T2a  409?                   → no
+### T2b  201 replay (not 409)?  → yes
+### T3b  different id?          → yes
+### T4a  504 after ~1s?         → yes
+### T4b  id == the book 4a made?→ yes
+### T4c  exactly one T4 book?   → yes
+### T5c  two T5 books?          → yes
+### T6   400?                   → yes
