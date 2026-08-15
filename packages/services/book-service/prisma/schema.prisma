@@ -28,3 +28,14 @@ enum BookStatus {
   PUBLISHED
   ARCHIVED
 }
+
+model IdempotencyKey {
+  key         String
+  authorId    String
+  requestHash String
+  bookId      String?
+  createdAt   DateTime @default(now())
+
+  @@unique([authorId, key])
+  @@index([createdAt])
+}

@@ -20,7 +20,6 @@ export const bookServiceProxy = {
             stripped['x-gateway-secret'] = config.secrets.gatewaySecret;
             return stripped;
         },
-        timeout: 2000,
-        // timeout: config.services.timeouts.book,
+        timeout: config.services.timeouts.book,
     },
 } satisfies FastifyHttpProxyOptions;

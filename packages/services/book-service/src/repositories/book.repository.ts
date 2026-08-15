@@ -1,9 +1,27 @@
 import prisma from '../lib/prisma.js';
 import { Prisma } from '../generated/prisma/index.js';
 
+interface CreateBookWithKeyInput extends Prisma.BookCreateInput {
+    idempKey: string;
+    requestHash: string;
+}
 export const bookRepository = {
-    async createBook(data: Prisma.BookCreateInput) {
-        return prisma.book.create({ data });
+    async createBook(data: CreateBookWithKeyInput) {
+        return await prisma.$transaction(async (tx) => {
+            const { idempKey, requestHash, ...bookData } = data;
+            await tx.idempotencyKey.create({
+                data: { authorId: data.authorId, key: idempKey, requestHash: requestHash },
+            });
+
+            const book = await tx.book.create({ data: bookData });
+
+            await tx.idempotencyKey.update({
+                where: { authorId_key: { authorId: data.authorId, key: data.idempKey } },
+                data: { bookId: book.id },
+            });
+
+            return book;
+        });
     },
 
     async findBooks() {

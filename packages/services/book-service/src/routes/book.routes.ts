@@ -1,15 +1,15 @@
-import { ApiResponse, authenticateUser, ForbiddenError, UnauthorizedError } from '@bookverse/shared';
+import { ApiResponse, authenticateUser, ForbiddenError, ValidationError } from '@bookverse/shared';
 import { bookService } from '../services/book.service.js';
 import {
     BookListResponseSchema,
     BookResponseSchema,
-    CreateBookInput,
     UpdateBookInput,
     UpdateBookSchema,
     CreateBookSchema,
     UpdateBookParamsSchema,
 } from '../schemas/book.schemas.js';
 import { FastifyTypeboxInstance } from '../types/fastify.js';
+import crypto from 'node:crypto';
 
 export async function bookRoutes(fastify: FastifyTypeboxInstance) {
     /*
@@ -34,38 +34,27 @@ export async function bookRoutes(fastify: FastifyTypeboxInstance) {
         reply.status(200).send(new ApiResponse('book fetched', book));
     });
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // TODO(amr) — Lesson 02 build task. These are YOURS to wire; left out on purpose.
-    //
-    // POST '/'  — protected, any logged-in user.
-    //   1. Add the MEDIUM layer: an `authenticateUser` preHandler (build it in
-    //      @bookverse/shared) that reads x-user-id / x-user-role / x-user-email
-    //      into request.user, and 401s if they're absent. Never default to
-    //      anonymous / undefined.
-    //   2. Attach it to THIS route only:  { preHandler: authenticateUser, schema: { body: CreateBookSchema, ... } }
-    //   3. In the handler, use request.user.id as the trusted authorId:
-    //         const book = await bookService.createBook(request.user.id, request.body);
-    //      Do NOT read request.headers['x-user-id'] here — only request.user, set by the plugin.
-    //
-    // PATCH '/:id' — protected, OWNER ONLY (the FINE layer).
-    //   Load the book, compare book.authorId to request.user.id, and reject
-    //   non-owners. (You decided 403 here — because book existence is already
-    //   public via GET.) This check lives in the service/route, NOT the gateway,
-    //   because only this service owns the books table.
-    //
-    // You'll also register `authenticateUser`'s Fastify type augmentation
-    // (declare module 'fastify' { interface FastifyRequest { user?: {...} } }).
-    // ─────────────────────────────────────────────────────────────────────────
-
     fastify.post(
         '/',
         { preHandler: authenticateUser, schema: { response: { 201: BookResponseSchema }, body: CreateBookSchema } },
         async (request, reply) => {
             const authorId = request.user!.id;
-            const bookData = request.body as CreateBookInput;
+            const body = request.body;
+            const idempKey = request.headers['idempotency-key'] as string;
 
-            const created = await bookService.createBook(authorId, bookData);
-            reply.status(201).send(new ApiResponse('Book created', created));
+            if (!idempKey) throw new ValidationError('Idempotency key required');
+
+            // put the body in a sorted form, so JSON.stringify produces same string before hash.
+            const sorted = Object.entries(body).sort(([k1, _v1], [k2, _v2]) => k1.localeCompare(k2));
+
+            // hash the request body as a fingerprint for this request
+            const requestHash = crypto.createHash('sha256').update(JSON.stringify(sorted)).digest('hex');
+
+            const created = await bookService.createBook(authorId, body, idempKey, requestHash);
+
+            const { book, replayed } = created;
+            request.log.info({ replayed, idempKey }, 'book create');
+            reply.status(201).send(new ApiResponse('Book created', book));
         },
     );
 
