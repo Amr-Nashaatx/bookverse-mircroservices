@@ -1,11 +1,18 @@
 # Fault injection is a first-class dev capability
 
-<!--
-Delete these four prompts as you answer them. Prose, first person, no ceremony.
-Aim for under a page. At least one fact you had to dig for.
+## What was the problem?
 
-- What went wrong? (the concrete failure, not the category)
-- What do I do now?
-- What else could I have done, and why didn't I?   <- the important one
-- What does it cost me?
--->
+I needed some sort of a knob to reproduce different types of failures, so I can test if my code is handling them properly.
+
+## What is the solution?
+
+I introduced a couple of dev-only headers, namely:
+
+- `x-fault-delay` — sleeps for the specified time before continuing.
+- `x-fault-status` — replies immediately with the specified status, without running the handler.
+
+## What are the other options?
+
+Well, Claude told me about a more mature and solid third-party solution called [Toxiproxy](https://github.com/Shopify/toxiproxy).
+
+It was the first time I'd ever heard of it, but I always prefer simplicity — so a couple of headers is simpler and does the job for now.

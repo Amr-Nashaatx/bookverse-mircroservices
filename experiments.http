@@ -231,15 +231,3 @@ Content-Type: application/json
 }
 
 
-### ============================================================
-### NOTES / RESULTS  (fill in as you run)
-### ============================================================
-### T1b  same id as T1a?        → yes
-### T2a  409?                   → no
-### T2b  201 replay (not 409)?  → yes
-### T3b  different id?          → yes
-### T4a  504 after ~1s?         → yes
-### T4b  id == the book 4a made?→ yes
-### T4c  exactly one T4 book?   → yes
-### T5c  two T5 books?          → yes
-### T6   400?                   → yes
