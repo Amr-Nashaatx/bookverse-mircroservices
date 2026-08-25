@@ -12,6 +12,10 @@ for (const envVar of requiredEnvVars) {
 export const config = {
     port: Number(process.env.PORT) || 3001,
     nodeEnv: process.env.NODE_ENV || 'development',
+    // Backstop, not the main control -- the gateway caps itself at 4 to us.
+    // Kept above that so it stays reachable for callers the cap can't cover.
+    // See docs/decisions/load-shedding.md.
+    maxInFlightRequests: 8,
     db: {
         url: process.env.AUTH_SERVICE_DATABASE_URL!,
     },
