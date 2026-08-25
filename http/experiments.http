@@ -1,4 +1,8 @@
-### BookVerse — Lesson 03 experiments: partial failure & idempotency
+### BookVerse — partial failure & idempotency.
+### Deliberately breaks things with the fault injector (x-fault-delay,
+### x-fault-status) to prove: per-hop timeouts fire, a timed-out write can be
+### retried safely, and a duplicate Idempotency-Key replays instead of creating.
+###
 ### Requires the "REST Client" VS Code extension. Run top to bottom.
 ###
 ### IMPORTANT: idempotency keys are permanent. Once a key is used it stays used,

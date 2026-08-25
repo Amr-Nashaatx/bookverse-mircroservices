@@ -1,4 +1,8 @@
-### BookVerse — manual API tests
+### BookVerse — happy path.
+### Normal API usage end to end: register, log in, read and write books.
+### Nothing here is failing on purpose; if a request here breaks, something is
+### actually wrong. Start with this file before the other two.
+###
 ### Requires the "REST Client" VS Code extension (or Thunder Client / Bruno).
 ### Click "Send Request" above each block. Cookies are stored & resent automatically.
 
