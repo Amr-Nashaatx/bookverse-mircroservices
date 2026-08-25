@@ -28,6 +28,7 @@
         "dev:container:book:exec": "npm run build:shared && node --inspect=0.0.0.0:9231 --import tsx packages/services/book-service/src/index.ts"
     },
     "devDependencies": {
+        "autocannon": "^8.0.0",
         "nodemon": "^3.1.10",
         "pino-pretty": "^13.1.3"
     },
