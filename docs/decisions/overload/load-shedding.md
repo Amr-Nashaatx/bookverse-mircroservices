@@ -1,42 +1,21 @@
-# Load shedding in auth-service
+# Load shedding
 
-<!--
-Prompts — delete each as you answer it. Prose, not a template.
+## Why load shedding?
 
-THE PROBLEM
-- What actually happens to auth-service past ~4 concurrent logins, and why is
-  bcrypt on a single thread the whole reason?
-- Say plainly why more load past that point buys queue time instead of
-  throughput. The response-time curve, in words.
+Let's talk about auth service as an example. Auth service had its routes make 2 calls to bcrypt for hashing, the package in use "bcryptjs" is all written in js and hence it all runs on a single thread or "lane" so each login request takes around ~100 ms.
+This number is only valid under no overload so each request comes and gets served without wait, i created a load testing script "sweep.mjs". it uses autocannon third party and as such the test was closed-loop i.e(on each connection a request is sent and waits for the reply to send again).
 
-FINDING THE NUMBER
-- How did you measure capacity, and why does the answer move between runs
-  (4.2-6.7/sec)? What do you do with a number that drifts?
-- limit = capacity x the latency you're willing to serve. Show your arithmetic,
-  and say which two facts the 8 depends on.
-- Why does the limit sit ABOVE the gateway's pool of 4 rather than equal to it?
-  What did you lose when they were equal?
+The sweep showed a terrible latency at P99 of ~1.3s at c = 8 (concurrent requests), and it keeps growing the more c grows. Against a hop timeout of 2s increasing concurrency would flat out throughput but goodput falls to zero.
 
-THE PART MOST PEOPLE GET WRONG — this is the transferable bit
-- You tried two symptom signals first. Write down the measurement: healthy
-  reads 198ms, fully collapsed reads 226ms. Why is that fatal?
-- The rule it generalises to: a signal that saturates cannot measure a quantity
-  that keeps growing. Where else might you hit that?
-- Why count directly instead? And when would you have no choice but a symptom?
+That's where load shedding comes into play, by shedding the load i.e (concurrent requests) at c = ~4 which is the knee for this service max throughput and goodput are achieved while keeping latency in check.
 
-OPERATING IT
-- Which routes must always answer, and what happens to a shedding service in an
-  orchestrator if /health is not one of them?
-- Liveness and readiness are different questions. Which one is "not right now"?
-- What does the user see? Why must it not read like a rejected password?
-- Once the limiter is on, in-flight pins at the limit. So what actually tells
-  you how much demand you're refusing?
-- Retry-After: you had to go and find what consumes it. What did you find, and
-  what would have happened if the gateway had retried the shed 503?
+## How load shedding is implemented?
 
-THE COST — the honest part
-- The A/B: at moderate overload the limiter bought no goodput at all, only
-  latency. At heavy overload it was 4-18x. Explain why, in terms of when work
-  starts being wasted.
-- So what is a limiter actually for? (Hint: it doesn't add capacity.)
--->
+I used a simple approach here, a global request counter that gets incremented with onRequest hook on each request and decrements whenever a response is set using onResponse.
+signals like /health that must respond (otherwise a healthy service could be considered dead) are exempt from the shedding.
+
+I also tried to shed based on event-loop delay and event-loop utilization but both gauges can have the same range in healthy or overloaded case so they can't be used for this purpose.
+
+## What are the consequences?
+
+Now whenever a service (auth service for example) receives more load than it can handle a 503 retry-after response with 1 s is sent.

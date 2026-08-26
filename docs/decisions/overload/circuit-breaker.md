@@ -1,49 +1,15 @@
 # The circuit breaker
 
-<!--
-Prompts — delete each as you answer it. Prose, not a template.
+## What and Why?
 
-THE PROBLEM
-- A saturated service doesn't return errors. It returns 200 OK, correct body,
-  four seconds late. What does that do to a breaker that counts error
-  responses?
-- So what actually converts "slow" into something countable? Follow that back
-  to why you set per-hop timeouts in the first place.
+Circuit breakers protect the caller from making requests and using resources on a dead or overloaded service. i implemented a breaker that has 3 states 'closed' | 'open' | 'half-open'.
+Typically it goes like this, as long as the breaker is closed it allows all requests through nothing new. It only starts when failures are reported and exceeded a specified threshold, in our case it is failureRateThreshold it then opens and wait for specified time namely cooldownMs in our case, after the cooldown time passes it goes to half-open state and allows only one probe request if it succeeds it means service is healthy and the breaker closes again if failed it opens and lets no requests through.
 
-WHAT COUNTS AS A FAILURE
-- Timeouts and connection errors: yes. 4xx: no — say why counting them would
-  lock everyone out during a spike of bad requests.
-- 500 is the interesting one. You decided it means neither success nor failure.
-  Write down the argument, including the sharp version: "doesn't mean
-  unhealthy" is not the same claim as "means healthy", and recording it as a
-  success would let fast errors mask slow ones.
-- What does your failure rate threshold already protect against, that you were
-  tempted to solve with the classification instead?
+## What counts as a failure?
 
-THE THREE NUMBERS — this is the exercise
-For each of windowMs, minimumRequests, failureRateThreshold, cooldownMs: what
-does it cost at double, and at half? Not the value — the consequence.
-- The one you found the hard way: windowMs and minimumRequests together set a
-  MINIMUM TRAFFIC RATE. At 10s/10 you needed a sustained 1 req/sec or the
-  breaker could never open at all. How did you discover that? (You couldn't
-  trip it by hand — and that was the finding, not the obstacle.)
-- cooldownMs vs windowMs: what did clearing the window on close buy you, and
-  what would have happened without it?
+Timeouts and connection errors, so status codes like (503, 504) are considered failures while 4xx are not they are very normal requests they don't report a dead or overloaded service.
+A special case is 500 which i chose to mean neither success nor failure, server errors do not give a clear signal for this matter.
 
-HALF-OPEN
-- Exactly one probe. What happens to a recovering service if you send the flood
-  that's been waiting?
-- The probe is never retried. Why?
-- The probe slot is released on a timeout as well as on a verdict. What breaks
-  if it isn't? (You'd met the same bug before as a counter that only went up.)
+## Scope
 
-SCOPE
-- One breaker per callee. Say what a single shared breaker would do the first
-  time book-service went down.
-- What would you have to change to run two gateway instances? What does each
-  instance know about the other's opinion of a callee?
-
-WHAT IT COST
-- What does an open circuit do to a user, and is that better or worse than what
-  they had before?
--->
+I use one circuit breaker per callee or service, because each service has totally different gauges and measurements, so no one fits all here.

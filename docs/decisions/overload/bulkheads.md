@@ -1,40 +1,19 @@
 # Bulkheads: a connection pool per callee
 
-<!--
-Prompts — delete each as you answer it. Prose, not a template.
+## Why and what?
 
-THE PROBLEM
-- The ship metaphor is where the name comes from, but state the actual failure
-  in your own system: one slow callee, a shared pool, and what happens to calls
-  aimed at the healthy services.
-- Before this, every callee got 128 connections. Who chose 128?
+Bulkheads: the term comes from a ship metaphor, and it is added to protect the caller from having the connection pool exhausted on a dead or very slow service and hence calls to other services find no slots at all.
 
-SIZING
-- auth 4, book 8 — both from measurement. Show the sweeps.
-- Book is sized from the WRITE path even though reads are ~4x cheaper. Why did
-  you size for the expensive route, and what does that cost the cheap one?
-- The result worth writing down: past the knee, capping concurrency made book
-  writes FASTER (319 -> 384/sec at 32 concurrent). Why? Say it in terms of what
-  the database is doing with 32 simultaneous transactions.
-- What would make you split the pool per route, and why isn't that today?
+In the current setup the bulkhead is only deployed on gateway service, so each service has its separate connection pool and one service's pool exhaustion does not affect the other.
+the package used for proxying on gateway (@fastify/http-proxy) has a separate connection pool per proxy of default size 128, so i had only to change the size to keep from overloading the services
 
-THE RELATIONSHIP WITH THE CALLEE'S OWN LIMIT
-- A bulkhead protects the caller. A shedder protects the callee. Different
-  jobs — what went wrong when you sized them equal?
-- Which one is the "main control" here, and which is the backstop?
+I chose bulkheads of 4 and 8 for auth and book services respectively, for book service i picked the bulkhead at the WRITE knee i.e(the knee measured from POST /books numbers) which caps reads at roughly 970/s but this number is nowhere near being needed so it works for both cases at this point, it will definitely change in the future, for auth it was different: throughput is capped from c = 1,
+so i cannot cap based on throughput measurements i simply chose based on Little's Law and what latency i am willing to serve so roughly it was something like: L = λ × W = 6.4/sec × ~0.6s ≈ 4.
 
-WHAT A BULKHEAD DOESN'T DO — the finding that surprised you
-- Goodput held flat at every load level. Good. But p50 went 159 -> 609 -> 1183
-  -> 2346ms as concurrency doubled, and every one of those returned 200.
-  Where did the queue go?
-- You traded a fast 503 for a slow 200 without deciding to. Which is better for
-  a login box?
-- Little's Law predicted all four rows (W = L/lambda). Write the arithmetic out
-  once — it's the thing that lets you read off the wait at any load without
-  measuring again.
+## Important consequences
 
-THE THING THAT MAKES IT FRAGILE
-- One gateway instance sends at most 4 to auth. Two instances send 8. What does
-  a per-caller pool NOT bound?
-- What has to be true for these numbers to still be right in six months?
--->
+Notice we now cap at gateway so connections above the bulkhead are queued at the gateway rather than the service it is sent to, which raises a different problem this queue at the gateway is unbounded which means the latency grows with load the exact problem i was trying to solve by load-shedding.
+
+## For the future
+
+The gateway queue needs to be bounded and requests that took more than their budget/deadline should be removed from the queue, serving them is doing orphaned work.

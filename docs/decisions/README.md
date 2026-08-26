@@ -18,4 +18,3 @@ renamed and reinvented, problems don't.
 - [Load shedding in auth-service](overload/load-shedding.md) — refusing work we cannot finish in time
 - [Bulkheads: a connection pool per callee](overload/bulkheads.md) — how much of ourselves one dependency may hold
 - [The circuit breaker](overload/circuit-breaker.md) — when to stop calling something that is clearly failing
-- [Deferred: request deadlines and admission control](overload/deferred-deadlines.md) — why half of this can't be built alone
