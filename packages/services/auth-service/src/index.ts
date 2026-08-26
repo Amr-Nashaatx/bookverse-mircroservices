@@ -80,7 +80,7 @@ fastify.register(async (secured) => {
     secured.addHook('preHandler', makeVerifyGatewaySecret(config.gateway.secrets));
     secured.register(authRoutes, { prefix: '/auth' });
 
-    // How loaded we are right now; read by scripts/autocannon.mjs. Behind the
+    // How loaded we are right now; read by scripts/sweep.mjs. Behind the
     // gateway secret -- how close to full we are is useful to an attacker.
     secured.get('/auth/pressure', async () => {
         const now = performance.eventLoopUtilization();

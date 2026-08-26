@@ -22,7 +22,8 @@ fastify.setErrorHandler(globalErrorHandler);
  * Not done: a per-request deadline, and admission control in front of each pool.
  * A first attempt at the deadline alone did nothing -- `handler` runs on arrival,
  * before the pool makes anything wait, so there was never any elapsed time to
- * subtract. The two only work together. See docs/decisions/deferred-deadlines.md.
+ * subtract. The two only work together -- see the end of
+ * docs/decisions/overload/bulkheads.md.
  */
 declare module 'fastify' {
     interface FastifyRequest {

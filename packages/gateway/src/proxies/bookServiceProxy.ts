@@ -6,7 +6,7 @@ import { FastifyHttpProxyOptions } from '@fastify/http-proxy';
 import { CircuitBreaker } from '../plugins/circuit-breaker.js';
 /*
  * Reads are retried, writes never are -- retrying a create that succeeded gives
- * you two books. See docs/decisions/read-retries.md.
+ * you two books. See docs/decisions/partial-failure/read-retries.md.
  */
 
 export const bookServiceProxy = (breaker: CircuitBreaker) =>
@@ -34,7 +34,7 @@ export const bookServiceProxy = (breaker: CircuitBreaker) =>
 
         // Sized from the WRITE path, the expensive one: writes stop improving
         // past ~8 concurrent. Costs ~30% of peak read throughput, which we are
-        // nowhere near needing. See docs/decisions/bulkheads.md.
+        // nowhere near needing. See docs/decisions/overload/bulkheads.md.
         undici: { connections: 8 },
         replyOptions: {
             rewriteRequestHeaders(request, headers) {

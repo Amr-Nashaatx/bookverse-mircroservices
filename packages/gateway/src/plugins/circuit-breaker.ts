@@ -6,7 +6,7 @@ import { FastifyBaseLogger } from 'fastify';
  * being down stops logins, the cascade this exists to prevent.
  *
  * Knows nothing about HTTP. Which responses count as failures is decided next to
- * the proxy that made the call. See docs/decisions/circuit-breaker.md.
+ * the proxy that made the call. See docs/decisions/overload/circuit-breaker.md.
  */
 
 export type CircuitState = 'closed' | 'open' | 'half-open';

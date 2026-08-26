@@ -9,7 +9,7 @@ export const authServiceProxy = (breaker: CircuitBreaker) =>
         prefix: '/auth',
 
         // Sized from measured capacity: auth completes ~6/sec and stops paying
-        // past ~4 concurrent. See docs/decisions/bulkheads.md.
+        // past ~4 concurrent. See docs/decisions/overload/bulkheads.md.
         undici: { connections: 4 },
         replyOptions: {
             rewriteRequestHeaders: (_request, headers) => {
