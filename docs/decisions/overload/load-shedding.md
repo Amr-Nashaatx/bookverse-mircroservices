@@ -3,7 +3,7 @@
 ## Why load shedding?
 
 Let's talk about auth service as an example. Auth service had its routes make 2 calls to bcrypt for hashing, the package in use "bcryptjs" is all written in js and hence it all runs on a single thread or "lane" so each login request takes around ~100 ms.
-This number is only valid under no overload so each request comes and gets served without wait, i created a load testing script "sweep.mjs". it uses autocannon third party and as such the test was closed-loop i.e(on each connection a request is sent and waits for the reply to send again).
+This number is only valid under no overload so each request comes and gets served without wait, i created a load testing script "sweep.mjs". it uses the autocannon package and as such the test was closed-loop i.e(on each connection a request is sent and waits for the reply to send again).
 
 The sweep showed a terrible latency at P99 of ~1.3s at c = 8 (concurrent requests), and it keeps growing the more c grows. Against a hop timeout of 2s increasing concurrency would flat out throughput but goodput falls to zero.
 
