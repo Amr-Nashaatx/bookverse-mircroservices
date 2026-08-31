@@ -15,8 +15,8 @@ renamed and reinvented, problems don't.
 
 ## [Boundaries](boundaries/) — where one service ends and the next begins, and what may cross
 
-- [Who owns which fact](boundaries/ownership.md) — one writer per fact, and what a copy costs
-- [Reviews as their own service](boundaries/review-service.md) — drawing a seam, and pricing what it breaks
+- [Service boundaries](boundaries/service-boundaries.md) — one writer per fact, the four questions to ask before drawing a seam, and the coupling that undoes it
+- [Reviews as their own service](boundaries/review-service.md) — trusting a bookId instead of verifying it, and what that buys
 
 ## [Overload](overload/) — more work arrives than can be done, and the queue does the damage
 
