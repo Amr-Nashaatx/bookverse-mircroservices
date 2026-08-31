@@ -22,7 +22,7 @@ export const UpdateBookSchema = Type.Object({
 export const BookSchema = Type.Object({
     id: Type.String({ format: 'uuid' }),
     title: Type.String(),
-    authorId: Type.String(),
+    ownerUserId: Type.String(),
     genre: Type.Array(Type.String()),
     description: Type.String(),
     coverImageUrl: Type.Union([Type.String(), Type.Null()]),

@@ -11,7 +11,9 @@ model Book {
   id            String     @id @default(uuid())
   title         String
   // The user who created the book. Ownership checks compare this to request.user.id.
-  authorId      String
+  // Named for the User it points at, not for the "author" role: an Author is a
+  // separate thing (pen name, approval status) that this service does not know about.
+  ownerUserId   String
   genre         String[]
   description   String
   coverImageUrl String?
@@ -20,7 +22,7 @@ model Book {
   createdAt     DateTime   @default(now())
   updatedAt     DateTime   @updatedAt
 
-  @@index([authorId])
+  @@index([ownerUserId])
 }
 
 enum BookStatus {
@@ -31,11 +33,12 @@ enum BookStatus {
 
 model IdempotencyKey {
   key         String
-  authorId    String
+  // The user the key is scoped to, so two callers can send the same key string.
+  ownerUserId String
   requestHash String
   bookId      String?
   createdAt   DateTime @default(now())
 
-  @@unique([authorId, key])
+  @@unique([ownerUserId, key])
   @@index([createdAt])
 }

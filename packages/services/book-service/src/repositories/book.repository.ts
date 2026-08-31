@@ -10,13 +10,13 @@ export const bookRepository = {
         return await prisma.$transaction(async (tx) => {
             const { idempKey, requestHash, ...bookData } = data;
             await tx.idempotencyKey.create({
-                data: { authorId: data.authorId, key: idempKey, requestHash: requestHash },
+                data: { ownerUserId: data.ownerUserId, key: idempKey, requestHash: requestHash },
             });
 
             const book = await tx.book.create({ data: bookData });
 
             await tx.idempotencyKey.update({
-                where: { authorId_key: { authorId: data.authorId, key: data.idempKey } },
+                where: { ownerUserId_key: { ownerUserId: data.ownerUserId, key: data.idempKey } },
                 data: { bookId: book.id },
             });
 

@@ -6,7 +6,7 @@ export const Events = {
 
 export type BookCreatedPayload = {
     bookId: string;
-    authorId: string;
+    ownerUserId: string;
     title: string;
 };
 
