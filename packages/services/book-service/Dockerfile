@@ -46,5 +46,7 @@ WORKDIR /app/packages/services/book-service
 
 EXPOSE 3002
 
-# Start the service. Run migrations manually with `npm run migrate:books` from the repo root.
+# Start the service. In dev, migrate from the HOST: `npm run migrate:books:deploy`
+# (or :dev to author one). Do not migrate from inside this container in dev --
+# compose mounts only src/, so the baked-in prisma/ here lags the working tree.
 CMD ["npm", "start"]
