@@ -13,6 +13,11 @@ renamed and reinvented, problems don't.
 - [Idempotent writes](partial-failure/idempotent-writes.md) — surviving a retry of a request that already succeeded
 - [Fault injection is a first-class dev capability](partial-failure/fault-injection.md) — you can't claim resilience you can't reproduce
 
+## [Boundaries](boundaries/) — where one service ends and the next begins, and what may cross
+
+- [Service boundaries](boundaries/service-boundaries.md) — one writer per fact, the four questions to ask before drawing a seam, and the coupling that undoes it
+- [Reviews as their own service](boundaries/review-service.md) — trusting a bookId instead of verifying it, and what that buys
+
 ## [Overload](overload/) — more work arrives than can be done, and the queue does the damage
 
 - [Load shedding in auth-service](overload/load-shedding.md) — refusing work we cannot finish in time

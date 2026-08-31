@@ -41,5 +41,7 @@ WORKDIR /app/packages/services/auth-service
 
 EXPOSE 3001
 
-# Start the service. Run migrations manually with `npm run migrate:auth` from the repo root.
+# Start the service. In dev, migrate from the HOST: `npm run migrate:auth:deploy`
+# (or :dev to author one). Do not migrate from inside this container in dev --
+# compose mounts only src/, so the baked-in prisma/ here lags the working tree.
 CMD ["npm", "start"]

@@ -38,7 +38,7 @@ export async function bookRoutes(fastify: FastifyTypeboxInstance) {
         '/',
         { preHandler: authenticateUser, schema: { response: { 201: BookResponseSchema }, body: CreateBookSchema } },
         async (request, reply) => {
-            const authorId = request.user!.id;
+            const ownerUserId = request.user!.id;
             const body = request.body;
             const idempKey = request.headers['idempotency-key'] as string;
 
@@ -50,7 +50,7 @@ export async function bookRoutes(fastify: FastifyTypeboxInstance) {
             // hash the request body as a fingerprint for this request
             const requestHash = crypto.createHash('sha256').update(JSON.stringify(sorted)).digest('hex');
 
-            const created = await bookService.createBook(authorId, body, idempKey, requestHash);
+            const created = await bookService.createBook(ownerUserId, body, idempKey, requestHash);
 
             const { book, replayed } = created;
             request.log.info({ replayed, idempKey }, 'book create');
@@ -65,13 +65,13 @@ export async function bookRoutes(fastify: FastifyTypeboxInstance) {
             schema: { response: { 200: BookResponseSchema }, body: UpdateBookSchema, params: UpdateBookParamsSchema },
         },
         async (request, reply) => {
-            const authorId = request.user!.id;
+            const ownerUserId = request.user!.id;
             const { id: bookId } = request.params as { id: string };
             const bookUpdateData = request.body as UpdateBookInput;
 
             // ownership check
             const book = await bookService.getBook(bookId);
-            if (book.authorId !== authorId) throw new ForbiddenError('You do not have permission for this action');
+            if (book.ownerUserId !== ownerUserId) throw new ForbiddenError('You do not have permission for this action');
 
             const updated = await bookService.updateBook(bookId, bookUpdateData);
             reply.send(new ApiResponse('Book updated'));

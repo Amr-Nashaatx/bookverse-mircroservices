@@ -59,7 +59,7 @@ Content-Type: application/json
 
 ### capture the new book's id + its owner
 @bookId = {{createBook.response.body.data.id}}
-@bookOwnerId = {{createBook.response.body.data.authorId}}
+@bookOwnerId = {{createBook.response.body.data.ownerUserId}}
 
 ### 4c. GET /books/:id — PUBLIC. → 200
 GET {{baseUrl}}/books/{{bookId}}
@@ -152,7 +152,7 @@ POST {{baseUrl}}/auth/logout
 ###     --post-data="{\"title\":\"Forged\",\"description\":\"minted without the gateway\",\"genre\":[\"x\"]}" \
 ###     http://book-service:3002/books/' 2>&1 | head -n 30
 ###
-### Then compare row 4's created authorId (11111111-…) against a real book's
+### Then compare row 4's created ownerUserId (11111111-…) against a real book's
 ### owner from 4b. The service cannot tell them apart.
 ###
 ### ---------------------------------------------------------------

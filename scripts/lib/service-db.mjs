@@ -13,6 +13,7 @@ import { config } from 'dotenv';
 export const SERVICES = {
     auth: { dir: 'packages/services/auth-service', urlVar: 'AUTH_SERVICE_DATABASE_URL', studioPort: 5555 },
     books: { dir: 'packages/services/book-service', urlVar: 'BOOK_SERVICE_DATABASE_URL', studioPort: 5556 },
+    reviews: { dir: 'packages/services/review-service', urlVar: 'REVIEW_SERVICE_DATABASE_URL', studioPort: 5557 },
 };
 
 export function resolveService(name) {

@@ -20,9 +20,13 @@ export const config = {
     services: {
         auth: process.env.AUTH_SERVICE_URL || 'http://localhost:3001/auth',
         book: process.env.BOOK_SERVICE_URL || 'http://localhost:3002/books',
+        review: process.env.REVIEW_SERVICE_URL || 'http://localhost:3003/reviews',
         timeouts: {
             auth: 2000,
             book: 1000,
+            // Starting point copied from book's hop. Re-measure with
+            // scripts/sweep.mjs once the service does real work.
+            review: 1000,
         },
     },
 };

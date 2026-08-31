@@ -1,6 +1,17 @@
 /*
  * Latency percentiles per route, reconstructed from a service's pino logs.
  *
+ * Answers "what did real traffic actually do?" — every route at once, with
+ * status codes, from requests you did not generate. It reads logs, so it adds
+ * no load to the thing it is measuring and can tell you about a slowdown that
+ * already happened.
+ *
+ * Its counterpart is scripts/sweep.mjs, which answers the opposite question:
+ * "what happens at concurrency N?" Sweep GENERATES load against one endpoint.
+ * Use sweep to find a knee or A/B a change; use this to read organic traffic
+ * (an .http run, a manual matrix) or to observe a system under someone else's
+ * load without adding your own.
+ *
  * Fastify logs each request twice: "incoming request" carries the URL, and
  * "request completed" carries responseTime + status. Neither line is useful
  * alone, so we join them.
@@ -9,7 +20,7 @@
  * counter that resets to req-1 on every restart, and nodemon restarts often.
  * Joining on reqId alone silently merges unrelated requests.
  *
- * Usage: node scripts/latency.mjs <gateway|auth|book> [options]
+ * Usage: node scripts/latency.mjs <gateway|auth|book|review> [options]
  *   --all              include /health (excluded by default — it dwarfs everything)
  *   --route <substr>   only routes containing this substring
  *   --tail <n>         log lines to scan (default 20000)
@@ -18,7 +29,7 @@
 import { spawn } from 'node:child_process';
 import { createInterface } from 'node:readline';
 
-const CONTAINERS = { gateway: 'gateway', auth: 'auth-service', book: 'book-service' };
+const CONTAINERS = { gateway: 'gateway', auth: 'auth-service', book: 'book-service', review: 'review-service' };
 
 const argv = process.argv.slice(2);
 const container = CONTAINERS[argv[0]];

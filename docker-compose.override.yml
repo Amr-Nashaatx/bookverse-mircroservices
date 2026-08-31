@@ -36,3 +36,15 @@ services:
             NODE_ENV: development
         ports:
             - '9231:9231'
+    review-service:
+        env_file:
+            - .env.dev
+        working_dir: /app
+        volumes:
+            - ./packages/services/review-service/src:/app/packages/services/review-service/src
+            - ./packages/shared/src:/app/packages/shared/src
+        command: ['npm', 'run', 'dev:container:review']
+        environment:
+            NODE_ENV: development
+        ports:
+            - '9232:9232'

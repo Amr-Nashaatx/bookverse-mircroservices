@@ -22,7 +22,7 @@ The solution I used here is to make the client mint an `Idempotency-Key` per int
 I did so by adding a new table for keys, and used 2 ideas on the database level:
 
 - First, I use a transaction to create the key before the book, so I don't get partial writes.
-- Second, I use a compound key on the new `IdempotencyKey` table on `(authorId, key)`, so each key is scoped per user and is itself identifiable.
+- Second, I use a compound key on the new `IdempotencyKey` table on `(ownerUserId, key)`, so each key is scoped per user and is itself identifiable.
 
 Now whenever I get a key conflict on the keys table, I know there is a retry and I act on it.
 

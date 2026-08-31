@@ -10,7 +10,7 @@ function serialize(book: Book): BookData {
     return {
         id: book.id,
         title: book.title,
-        authorId: book.authorId,
+        ownerUserId: book.ownerUserId,
         genre: book.genre,
         description: book.description,
         coverImageUrl: book.coverImageUrl,
@@ -38,22 +38,22 @@ export const bookService = {
     },
 
     /*
-     * Creates a book owned by `authorId` (the authenticated caller).
-     * The route layer is responsible for supplying a trusted authorId —
-     * see the TODO in book.routes.ts. The service never reads headers.
+     * Creates a book owned by `ownerUserId` (the authenticated caller).
+     * The route layer supplies that id from the verified identity; the service
+     * never reads headers.
      */
     async createBook(
-        authorId: string,
+        ownerUserId: string,
         input: CreateBookInput,
         idempKey: string,
         requestHash: string,
     ): Promise<CreateBookOutcome> {
         try {
-            const book = await bookRepository.createBook({ authorId, idempKey, requestHash, ...input });
+            const book = await bookRepository.createBook({ ownerUserId, idempKey, requestHash, ...input });
             return { replayed: false, book: serialize(book) };
         } catch (e) {
             if (e instanceof PrismaClientKnownRequestError && e.code === 'P2002') {
-                const key = (await keyRepository.findKeyByAuthorAndId(authorId, idempKey))!;
+                const key = (await keyRepository.findKeyByOwnerAndId(ownerUserId, idempKey))!;
 
                 // Same key, different request body. 422. The client has a bug — reusing a key for a different intent
                 if (requestHash !== key.requestHash) throw new ConflictError('Invalid key reuse');

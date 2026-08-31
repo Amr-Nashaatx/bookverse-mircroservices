@@ -7,14 +7,14 @@
  * pino-pretty. `--no-log-prefix` is required: Docker's "gateway  | " prefix
  * would otherwise break JSON parsing.
  *
- * Usage: node scripts/logs.mjs <gateway|auth|book> [--errors] [-- <docker flags>]
+ * Usage: node scripts/logs.mjs <gateway|auth|book|review> [--errors] [-- <docker flags>]
  *   --errors   only level >= 50 (pino: 50 = error, 60 = fatal)
  */
 import { spawn } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { createInterface } from 'node:readline';
 
-const CONTAINERS = { gateway: 'gateway', auth: 'auth-service', book: 'book-service' };
+const CONTAINERS = { gateway: 'gateway', auth: 'auth-service', book: 'book-service', review: 'review-service' };
 
 const argv = process.argv.slice(2);
 const container = CONTAINERS[argv[0]];
