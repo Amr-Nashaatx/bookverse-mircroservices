@@ -21,7 +21,7 @@ Content-Type: application/json
 }
 
 ###
-@accessToken = {{login.response.body.data.accessToken}}
+@accessToken = {{login.response.body.data.tokens.accessToken}}
 
 ### 2. Create a book to review (owner = the logged-in user)
 # @name createBook
