@@ -9,6 +9,7 @@ import { config } from './config/index.js';
 // Utils
 import { bookServiceProxy } from './proxies/bookServiceProxy.js';
 import { authServiceProxy } from './proxies/authServiceProxy.js';
+import { reviewServiceProxy } from './proxies/reviewServiceProxy.js';
 import { createCircuitBreaker } from './plugins/circuit-breaker.js';
 
 // Third-party plugins
@@ -45,6 +46,19 @@ const bookServiceBreaker = createCircuitBreaker(
     fastify.log,
 );
 
+const reviewServiceBreaker = createCircuitBreaker(
+    {
+        minimumRequests: 10,
+        failureRateThreshold: 0.5,
+        name: 'review-service',
+        // review's hop timeout is 1s and probes are never retried.
+        probeTimeoutMs: 2_000,
+        windowMs: 60_000,
+        cooldownMs: 50_000,
+    },
+    fastify.log,
+);
+
 const authServiceBreaker = createCircuitBreaker(
     {
         minimumRequests: 10,
@@ -65,6 +79,7 @@ fastify.register(fastifyHttpProxy, authServiceProxy(authServiceBreaker));
 // Proxies Protected
 fastify.register(async (fastify) => {
     fastify.register(fastifyHttpProxy, bookServiceProxy(bookServiceBreaker));
+    fastify.register(fastifyHttpProxy, reviewServiceProxy(reviewServiceBreaker));
     // other services later...
 });
 
