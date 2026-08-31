@@ -7,6 +7,7 @@ systems fail — the reasoning for each choice lives in [`docs/decisions/`](docs
 ## Running it
 
 ```bash
+cp .env.example .env.dev                          # then fill in the blanks
 npm run compose                                   # bring the stack up (dev)
 npm run migrate:books:dev -- --name <name>        # author a migration + apply it
 npm run migrate:books:deploy                      # apply existing migrations only

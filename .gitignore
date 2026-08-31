@@ -3,6 +3,9 @@ dist/
 learning/
 .env
 .env.*
+# The template is the one env file that must be committed -- it carries no
+# values, and without it nobody can tell what .env.dev needs to contain.
+!.env.example
 *.log
 
 PROGRESS.md
