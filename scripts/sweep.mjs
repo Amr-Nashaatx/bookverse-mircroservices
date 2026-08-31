@@ -116,6 +116,15 @@ const OPERATIONS = {
      * a 404 path against a 201 path instead of measuring the hop.
      */
     reviewCreate: (ctx) => ({
+        /*
+         * Count non-2xx in the latency stats, unlike every other operation.
+         * Almost every response here is a 409 (see above), and excluding them
+         * leaves the histogram empty -- percentiles read a confident 0 while
+         * throughput says 27ms. The 409 IS the representative path for this
+         * operation, and both A/B arms take it identically, so the delta
+         * between them is still purely the call to book-service.
+         */
+        excludeErrorStats: false,
         url: `${GATEWAY}/reviews`,
         method: 'POST',
         headers: {
@@ -215,13 +224,13 @@ async function run(name, connections, duration, { only }) {
             : null;
 
         const res = await autocannon({
+            // Keep failures out of the percentiles, so they always mean
+            // "how long a successful request took". Listed first so an
+            // operation whose representative path is non-2xx can override it.
+            excludeErrorStats: true,
             ...options,
             connections: c,
             duration,
-
-            // Keep failures out of the percentiles, so they always mean
-            // "how long a successful request took".
-            excludeErrorStats: true,
         });
 
         if (poller) clearInterval(poller);
