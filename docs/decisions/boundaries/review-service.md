@@ -4,8 +4,9 @@ The only significant design choice here is whether to check existence of book wh
 
 ## What it costs, measured
 
-Both paths are built. `REVIEW_VERIFY_BOOK_EXISTS` switches between them, so these
-are the same code measured twice rather than an estimate.
+Both paths were built, and `REVIEW_VERIFY_BOOK_EXISTS` switched between them, so these
+are the same code measured twice rather than an estimate. The hard path has since
+been deleted — these numbers are why.
 
 **Latency** — `POST /reviews` at one connection, medians of three alternated runs:
 

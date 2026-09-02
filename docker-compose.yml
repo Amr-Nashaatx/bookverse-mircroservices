@@ -113,10 +113,6 @@ services:
         environment:
             NODE_ENV: ${NODE_ENV:-development}
             PORT: 3003
-            BOOK_SERVICE_URL: http://book-service:3002/books
-            # Soft dependency by default. Set to "true" to make book-service a
-            # hard dependency and measure the cost (Build 3).
-            REVIEW_VERIFY_BOOK_EXISTS: ${REVIEW_VERIFY_BOOK_EXISTS:-false}
         depends_on:
             postgres:
                 condition: service_healthy

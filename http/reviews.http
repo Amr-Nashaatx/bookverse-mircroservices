@@ -119,9 +119,10 @@ Content-Type: application/json
 ### THE SEAM — a bookId that points at nothing
 ### ---------------------------------------------------------------
 
-### 6. Review a book that does not exist. → 201 with REVIEW_VERIFY_BOOK_EXISTS=false
-###    This is the soft dependency, visible. The review is accepted and now
-###    references nothing. With the flag "true" this is a 404 instead.
+### 6. Review a book that does not exist. → 201
+###    This is the soft dependency, visible. review-service never asks
+###    book-service whether the book is real, so the review is accepted and
+###    now references nothing. That is the deliberate choice, not an oversight.
 POST {{baseUrl}}/reviews
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
@@ -147,18 +148,21 @@ Content-Type: application/json
 ### Expect 401: the gateway is the only caller review-service accepts.
 
 ### ---------------------------------------------------------------
-### BUILD 3 — measuring what the boundary costs
+### WHAT THE BOUNDARY COSTS — measured, then decided
 ### ---------------------------------------------------------------
 ###
-### Latency of the hard path:
-###   set REVIEW_VERIFY_BOOK_EXISTS=true in .env.dev, `npm run compose`,
-###   then run 3a repeatedly and compare `npm run latency:review` against
-###   the same run with the flag false. Alternate arms in one sitting.
+### The hard path (verify the book on every write) was built, measured and
+### then removed. The numbers that justified removing it live in
+### docs/decisions/boundaries/review-service.md: ~4 ms and ~16% of write
+### capacity at c=1, and — the decisive one — with book-service stopped the
+### hard path returned 503 in 1.035 s while the soft path returned 201 in
+### 0.017 s. Faster when the dependency is down, because a call that never
+### needed to happen is skipped.
 ###
-### Availability of the hard path:
-###   docker compose stop book-service
-###   then send 3a. With the flag false → 201. With it true → 503.
-###   That gap is the whole hard-vs-soft argument, measured.
+### review-service now has NO dependency on book-service, in either direction.
+### Worth knowing before Lesson 06 Build 1: if the composer ends up inside
+### book-service, book → review becomes a live call, and re-adding a call the
+### other way would then close a cycle.
 
 ### 7. Cleanup — owner deletes own review. → 204
 DELETE {{baseUrl}}/reviews/{{reviewId}}

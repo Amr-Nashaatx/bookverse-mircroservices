@@ -102,18 +102,14 @@ const OPERATIONS = {
     }),
 
     /*
-     * The Build 3 A/B: run this with REVIEW_VERIFY_BOOK_EXISTS false, then
-     * true, and the delta is what one synchronous hop costs on a write path.
-     *
      * Expect mostly 409s, and that is fine. The unique (bookId, userId) index
-     * means only the first request inserts; the rest conflict. Both arms do the
-     * same database work, so the difference between them is purely the call to
-     * book-service — which happens BEFORE the insert and therefore still runs
-     * on every conflicting request.
+     * means only the first request inserts; the rest conflict. The 409 path is
+     * the representative one for this operation, so read the percentiles rather
+     * than goodput here -- goodput is near-zero by construction.
      *
-     * Do not "fix" this by sending a random bookId per request: with the flag
-     * on, book-service would 404 every one of them, and you would be comparing
-     * a 404 path against a 201 path instead of measuring the hop.
+     * Do not "fix" this by sending a random bookId per request: review-service
+     * accepts any bookId on trust, so you would only be changing which rows the
+     * insert touches, not what the operation measures.
      */
     reviewCreate: (ctx) => ({
         /*
@@ -121,8 +117,7 @@ const OPERATIONS = {
          * Almost every response here is a 409 (see above), and excluding them
          * leaves the histogram empty -- percentiles read a confident 0 while
          * throughput says 27ms. The 409 IS the representative path for this
-         * operation, and both A/B arms take it identically, so the delta
-         * between them is still purely the call to book-service.
+         * operation, so its latency is the one worth recording.
          */
         excludeErrorStats: false,
         url: `${GATEWAY}/reviews`,

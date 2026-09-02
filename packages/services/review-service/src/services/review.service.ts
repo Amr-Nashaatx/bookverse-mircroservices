@@ -1,9 +1,8 @@
-import { AppError, ConflictError, ForbiddenError, NotFoundError } from '@bookverse/shared';
+import { ConflictError, ForbiddenError, NotFoundError } from '@bookverse/shared';
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/client';
 import type { Review } from '../generated/prisma/index.js';
 import { reviewRepository } from '../repositories/review.repository.js';
 import type { CreateReviewInput, ReviewData, UpdateReviewInput } from '../schemas/review.schemas.js';
-import { config } from '../config/index.js';
 
 // Shape a Prisma Review (with Date objects) into the serializable response DTO.
 function serialize(review: Review): ReviewData {
@@ -16,30 +15,6 @@ function serialize(review: Review): ReviewData {
         createdAt: review.createdAt.toISOString(),
         updatedAt: review.updatedAt.toISOString(),
     };
-}
-
-/*
- * The whole hard-dependency path, in one function. Off by default.
- *
- * When on, every review write waits on book-service, so this service is
- * available only when book-service is too. When off, nothing here runs and a
- * bookId is taken on trust.
- */
-async function assertBookExists(bookId: string): Promise<void> {
-    let response: Response;
-    try {
-        response = await fetch(`${config.bookService.url}/${bookId}`, {
-            headers: { 'x-gateway-secret': config.bookService.callerSecret },
-            signal: AbortSignal.timeout(config.bookService.timeoutMs),
-        });
-    } catch {
-        // Timeout or connection failure: we do not know whether the book exists.
-        // Refusing is the honest answer -- this is the cost of the hard path.
-        throw new AppError('Could not verify the book right now', 503);
-    }
-
-    if (response.status === 404) throw new NotFoundError('book not found');
-    if (!response.ok) throw new AppError('Could not verify the book right now', 503);
 }
 
 export const reviewService = {
@@ -60,8 +35,6 @@ export const reviewService = {
      * never reads headers.
      */
     async createReview(userId: string, input: CreateReviewInput): Promise<ReviewData> {
-        if (config.bookService.verifyBookExists) await assertBookExists(input.bookId);
-
         try {
             const review = await reviewRepository.createReview({ ...input, userId });
             return serialize(review);
