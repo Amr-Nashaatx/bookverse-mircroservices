@@ -1,12 +1,12 @@
-import { FastifyBaseLogger } from 'fastify';
-
 /*
  * A circuit breaker for ONE callee: when it is clearly failing, stop calling it
  * for a while. Create one per callee -- a shared breaker would mean book-service
  * being down stops logins, the cascade this exists to prevent.
  *
- * Knows nothing about HTTP. Which responses count as failures is decided next to
- * the proxy that made the call. See docs/decisions/overload/circuit-breaker.md.
+ * Knows nothing about HTTP, and does no logging of its own -- it announces its
+ * state changes and whoever wired it decides where those go. Which responses
+ * count as failures is decided next to the proxy that made the call.
+ * See docs/decisions/overload/circuit-breaker.md.
  */
 
 export type CircuitState = 'closed' | 'open' | 'half-open';
@@ -35,126 +35,154 @@ export interface CircuitBreakerOptions {
     cooldownMs: number;
 }
 
+/** Everything the breaker knows at the moment it changes state. */
+export type CircuitTransition = {
+    breaker: string;
+    from: CircuitState;
+    to: CircuitState;
+    failures: number;
+    total: number;
+    reason: string;
+};
+
+type TransitionListener = (transition: CircuitTransition) => void;
+
 /** One recorded attempt. `at` is what makes the window slide. */
 interface Outcome {
     at: number;
     failed: boolean;
 }
 
-export interface CircuitBreaker {
-    /** Call before making the request. False means: do not call the callee. */
-    allowRequest(): 'allowed' | 'refused' | 'probe';
-    /** The attempt came back healthy. */
-    recordSuccess(): void;
-    /** The attempt failed. `reason` is only for the transition log. */
-    recordFailure(reason: string): void;
-    /** Lets you see the state rather than infer it. */
-    snapshot(): { state: CircuitState; failures: number; total: number };
-}
-
-export function createCircuitBreaker(options: CircuitBreakerOptions, log: FastifyBaseLogger): CircuitBreaker {
-    let state: CircuitState = 'closed';
-    let outcomes: Outcome[] = [];
+export class CircuitBreaker {
+    private state: CircuitState = 'closed';
+    private outcomes: Outcome[] = [];
 
     /** When we opened, so we know when the cooldown is up. */
-    let openedAt = 0;
+    private openedAt = 0;
 
     /** True while the single half-open probe is still out. */
-    let probeInFlight = false;
-    let probeSentAt = 0;
+    private probeInFlight = false;
+    private probeSentAt = 0;
 
-    /** Drop anything older than the window -- what makes it sliding. */
-    function prune(now: number): void {
-        outcomes = outcomes.filter((o) => o.at > now - options.windowMs);
+    private listeners: TransitionListener[] = [];
+
+    constructor(private options: CircuitBreakerOptions) {}
+
+    /** Told on every state change. Register as many as you like. */
+    onTransition(listener: TransitionListener) {
+        this.listeners.push(listener);
+        return this;
     }
 
-    function counts(): { failures: number; total: number } {
-        const failures = outcomes.reduce((n, o) => n + (o.failed ? 1 : 0), 0);
-        return { failures, total: outcomes.length };
+    /** Drop anything older than the window -- what makes it sliding. */
+    private prune(now: number): void {
+        this.outcomes = this.outcomes.filter((o) => o.at > now - this.options.windowMs);
+    }
+
+    private counts(): { failures: number; total: number } {
+        const failures = this.outcomes.reduce((n, o) => n + (o.failed ? 1 : 0), 0);
+        return { failures, total: this.outcomes.length };
     }
 
     // The only place `state` is assigned, so every change is logged with the
     // counts that caused it. Never set `state` directly.
-    function transitionTo(next: CircuitState, reason: string): void {
-        if (next === state) return;
+    private transitionTo(next: CircuitState, reason: string): void {
+        if (next === this.state) return;
 
-        const { failures, total } = counts();
-        log.warn({ breaker: options.name, from: state, to: next, failures, total, reason }, 'circuit breaker');
+        const { failures, total } = this.counts();
+        const transition: CircuitTransition = {
+            breaker: this.options.name,
+            from: this.state,
+            to: next,
+            failures,
+            total,
+            reason,
+        };
 
-        // state transitions
-        let closedToOpen = next === 'open' && state === 'closed';
-        let halfOpenToOpen = next === 'open' && state === 'half-open';
-        let openTopHalfOpen = next === 'half-open' && state === 'open';
-        let halfOpenToClosed = next === 'closed' && state === 'half-open';
-
-        if (closedToOpen) openedAt = Date.now();
-        else if (halfOpenToOpen) {
-            openedAt = Date.now();
-            probeInFlight = false;
-        } else if (openTopHalfOpen) {
-            probeInFlight = false;
-        } else if (halfOpenToClosed) {
-            probeInFlight = false;
-            outcomes = [];
+        for (const notify of this.listeners) {
+            // Swallowed on purpose: a listener that throws  a logger with a
+            // bad stream must not leave the breaker mid-transition.
+            try {
+                notify(transition);
+            } catch {}
         }
 
-        state = next;
+        // state transitions
+        let closedToOpen = next === 'open' && this.state === 'closed';
+        let halfOpenToOpen = next === 'open' && this.state === 'half-open';
+        let openTopHalfOpen = next === 'half-open' && this.state === 'open';
+        let halfOpenToClosed = next === 'closed' && this.state === 'half-open';
+
+        if (closedToOpen) this.openedAt = Date.now();
+        else if (halfOpenToOpen) {
+            this.openedAt = Date.now();
+            this.probeInFlight = false;
+        } else if (openTopHalfOpen) {
+            this.probeInFlight = false;
+        } else if (halfOpenToClosed) {
+            this.probeInFlight = false;
+            this.outcomes = [];
+        }
+
+        this.state = next;
     }
 
-    function shouldOpen(now: number): boolean {
-        prune(now);
-        const { failures, total } = counts();
+    private shouldOpen(now: number): boolean {
+        this.prune(now);
+        const { failures, total } = this.counts();
 
         // The volume floor comes FIRST -- a rate computed from two samples is noise.
-        if (total < options.minimumRequests) return false;
+        if (total < this.options.minimumRequests) return false;
 
-        return failures / total >= options.failureRateThreshold;
+        return failures / total >= this.options.failureRateThreshold;
     }
 
-    return {
-        allowRequest(): 'allowed' | 'refused' | 'probe' {
-            const now = Date.now();
+    /** Call before making the request. False means: do not call the callee. */
+    allowRequest(): 'allowed' | 'refused' | 'probe' {
+        const now = Date.now();
 
-            if (state === 'open') {
-                // Checked when someone asks rather than on a timer -- nothing to
-                // cancel on shutdown, and an idle circuit costs nothing.
-                if (now - openedAt < options.cooldownMs) return 'refused';
-                transitionTo('half-open', 'cooldown elapsed');
-            }
+        if (this.state === 'open') {
+            // Checked when someone asks rather than on a timer -- nothing to
+            // cancel on shutdown, and an idle circuit costs nothing.
+            if (now - this.openedAt < this.options.cooldownMs) return 'refused';
+            this.transitionTo('half-open', 'cooldown elapsed');
+        }
 
-            if (state === 'half-open') {
-                // Exactly one probe at a time. The timeout is what stops a probe
-                // that never reports back from wedging the circuit shut forever.
-                if (probeInFlight && now - probeSentAt < options.probeTimeoutMs) return 'refused';
-                probeInFlight = true;
-                probeSentAt = Date.now();
-                return 'probe';
-            }
+        if (this.state === 'half-open') {
+            // Exactly one probe at a time. The timeout is what stops a probe
+            // that never reports back from wedging the circuit shut forever.
+            if (this.probeInFlight && now - this.probeSentAt < this.options.probeTimeoutMs) return 'refused';
+            this.probeInFlight = true;
+            this.probeSentAt = Date.now();
+            return 'probe';
+        }
 
-            return 'allowed';
-        },
+        return 'allowed';
+    }
 
-        recordSuccess(): void {
-            // In half-open this is the probe reporting clean; elsewhere it is
-            // just bookkeeping. Only the former moves the state.
-            outcomes.push({ at: Date.now(), failed: false });
-            if (state === 'half-open') {
-                transitionTo('closed', 'probe success');
-            }
-        },
+    /** The attempt came back healthy. */
+    recordSuccess(): void {
+        // In half-open this is the probe reporting clean; elsewhere it is
+        // just bookkeeping. Only the former moves the state.
+        this.outcomes.push({ at: Date.now(), failed: false });
+        if (this.state === 'half-open') {
+            this.transitionTo('closed', 'probe success');
+        }
+    }
 
-        recordFailure(reason: string): void {
-            const now = Date.now();
+    /** The attempt failed. `reason` is only for the transition log. */
+    recordFailure(reason: string): void {
+        const now = Date.now();
 
-            // A failed probe is the whole answer on its own -- no threshold needed.
-            outcomes.push({ at: now, failed: true });
-            if (state === 'half-open') transitionTo('open', 'probe failed');
-            else if (shouldOpen(now)) transitionTo('open', reason);
-        },
+        // A failed probe is the whole answer on its own -- no threshold needed.
+        this.outcomes.push({ at: now, failed: true });
+        if (this.state === 'half-open') this.transitionTo('open', 'probe failed');
+        else if (this.shouldOpen(now)) this.transitionTo('open', reason);
+    }
 
-        snapshot() {
-            prune(Date.now());
-            return { state, ...counts() };
-        },
-    };
+    /** Lets you see the state rather than infer it. */
+    snapshot(): { state: CircuitState; failures: number; total: number } {
+        this.prune(Date.now());
+        return { state: this.state, ...this.counts() };
+    }
 }
