@@ -17,6 +17,7 @@ renamed and reinvented, problems don't.
 
 - [Service boundaries](boundaries/service-boundaries.md) — one writer per fact, the four questions to ask before drawing a seam, and the coupling that undoes it
 - [Reviews as their own service](boundaries/review-service.md) — trusting a bookId instead of verifying it, and what that buys
+- [Composing a read across two services](boundaries/composed-reads.md) — joining a book with its reviews at read time, and what the page does when half of it is unavailable
 
 ## [Overload](overload/) — more work arrives than can be done, and the queue does the damage
 

@@ -42,6 +42,7 @@ Content-Type: application/json
 ### ================================================================
 
 ### 4a. GET /books — PUBLIC (no token). Reads are open at the gateway. → 200
+# @name fetchAllBooks
 GET {{baseUrl}}/books
 
 ### 4b. POST /books — PROTECTED, valid token (matrix row 1). → 201
@@ -63,6 +64,11 @@ Content-Type: application/json
 
 ### 4c. GET /books/:id — PUBLIC. → 200
 GET {{baseUrl}}/books/{{bookId}}
+
+### fetch a book by Id
+@arbitraryBookId = {{fetchAllBooks.response.body.data[0].id}}
+GET {{baseUrl}}/books/{{arbitraryBookId}}
+
 
 ### 4d. PATCH /books/:id — OWNER updating own book. → 200
 PATCH {{baseUrl}}/books/{{bookId}}

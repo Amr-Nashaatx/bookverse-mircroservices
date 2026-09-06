@@ -1,5 +1,6 @@
 import { CircuitBreaker } from '../plugins/circuit-breaker.js';
 import { ServiceProxy } from './ServiceProxy.js';
+import { classifyOutcome } from '../breakers/classifyOutcome.js';
 
 /*
  * The seam between the two: the breaker counts outcomes and knows nothing about
@@ -22,16 +23,14 @@ export function guardWithBreaker(proxy: ServiceProxy, breaker: CircuitBreaker) {
 
     // Observers only: ServiceProxy owns the single send.
     proxy.addResponseObserver((_request, response) => {
-        const breakStatuscodes = [503, 504];
-        if (breakStatuscodes.includes(response.statusCode)) {
-            return breaker.recordFailure(`Response with status ${response.statusCode}`);
-        }
-
         // 500 is ambiguous -- it can be one bad input rather than a sick service.
         // Recorded as neither success nor failure.
-        if (response.statusCode === 500) return;
 
-        breaker.recordSuccess();
+        const outcome = classifyOutcome(response.statusCode);
+        if (outcome === 'failure') {
+            return breaker.recordFailure(`Response with status ${response.statusCode}`);
+        } else if (outcome === 'unknown') return;
+        else breaker.recordSuccess();
     });
 
     proxy.addErrorObserver((_request, error) => breaker.recordFailure(`Request error: ${error.message}`));

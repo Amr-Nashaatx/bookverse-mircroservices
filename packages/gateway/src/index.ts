@@ -11,6 +11,7 @@ import { bookServiceBreaker } from './breakers/book-breaker.js';
 import { reviewServiceBreaker } from './breakers/review-breaker.js';
 import { ServiceProxy } from './proxies/ServiceProxy.js';
 import { authProxySepc, bookProxySepc, reviewProxySpec } from './config/proxySpecs.js';
+import { bookPageRoutes } from './routes/bookPage.js';
 
 // Third-party plugins
 const fastify = Fastify({ logger: true });
@@ -37,10 +38,13 @@ for (const breaker of [authServiceBreaker, bookServiceBreaker, reviewServiceBrea
     breaker.onTransition((transition) => fastify.log.warn(transition, 'circuit breaker'));
 }
 
-// Proxies Public
 fastify.decorateRequest('user', null as any);
 fastify.decorateRequest('isProbe', false);
 
+// composed route
+fastify.register(bookPageRoutes);
+
+// Proxies Public
 new ServiceProxy(fastify, authProxySepc).buildAndRegisterProxy(authServiceBreaker);
 
 // Proxies Protected

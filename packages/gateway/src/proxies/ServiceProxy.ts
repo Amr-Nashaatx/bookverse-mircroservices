@@ -11,8 +11,12 @@ export type ServiceEdgeSpec = {
     upstream: string;
     prefix: string;
     forwardsIdentity?: boolean;
-    timeoutMs?: number;
-    connections?: number;
+    /** Required: a measured per-edge value, so a new edge cannot silently
+     *  inherit someone else's hop budget. */
+    timeoutMs: number;
+    /** Required, same reason: this is the bulkhead, sized from the callee's
+     *  measured knee. See docs/decisions/overload/bulkheads.md. */
+    connections: number;
     /** 503 retries per request, and ONLY 503s on GET. Connection errors are
      *  governed by reply-from's `retriesCount`, which defaults to never. */
     retriesOn503?: number;
@@ -34,7 +38,7 @@ type EdgePreHandler = (request: FastifyRequest, reply: FastifyReply) => Promise<
  *
  * @fastify/http-proxy carries @fastify/reply-from's types out through
  * `replyOptions`, and reply-from is a dependency we never chose. So it stops
- * here: the adapter in `finalizeProxy` is the only code that sees those types,
+ * here: the adapter in `buildAndRegisterProxy` is the only code that sees those types,
  * and everything registered from outside speaks these instead.
  */
 
@@ -67,8 +71,8 @@ export class ServiceProxy {
         this.proxy = {} as FastifyHttpProxyOptions;
         this.proxy.prefix = this.spec.prefix;
         this.proxy.upstream = this.spec.upstream;
-        this.proxy.undici = { connections: this.spec.connections || 4 };
-        this.proxy.replyOptions = { timeout: this.spec.timeoutMs || 1000 };
+        this.proxy.undici = { connections: this.spec.connections };
+        this.proxy.replyOptions = { timeout: this.spec.timeoutMs };
         if (this.spec.forwardsIdentity) {
             this.addPreHandlerLogic(async (request, reply) => {
                 if (request.method !== 'GET') await verifyJwt(request, reply);
@@ -134,18 +138,24 @@ export class ServiceProxy {
          *                 hop is why neither half makes sense on its own.
          */
         this.proxy.handler = (request, reply, dest, options) => {
-            // reply-from reads it as `opts.maxRetriesOn503 || 10`, so a zero becomes ten.
-            if (this.retryVetoes.some((veto) => veto(request))) {
+            const retries = this.spec.retriesOn503 ?? 3;
+            const vetoed = this.retryVetoes.some((veto) => veto(request));
+
+            /*
+             * Both cases mean "do not retry this one", and both need the same
+             * hard stop. A veto is per-request; `retries === 0` is the spec
+             * saying never. Zero cannot be expressed through maxRetriesOn503 --
+             * reply-from reads it as `opts.maxRetriesOn503 || 10`, so passing 0
+             * would buy ten retries instead of none.
+             */
+            if (vetoed || retries === 0) {
                 return reply.from(dest, { ...options, retryDelay: () => null });
             }
 
             // Per request, because reply-from reads maxRetriesOn503 only from
-            // these options. Set alongside `upstream` is
+            // these options -- set alongside `upstream` it type-checks and is
             // silently ignored.
-            return reply.from(dest, {
-                ...options,
-                maxRetriesOn503: this.spec.retriesOn503 ?? 3,
-            } as typeof options);
+            return reply.from(dest, { ...options, maxRetriesOn503: retries } as typeof options);
         };
 
         this.proxy.replyOptions = {
