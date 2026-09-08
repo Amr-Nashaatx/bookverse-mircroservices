@@ -19,6 +19,10 @@ renamed and reinvented, problems don't.
 - [Reviews as their own service](boundaries/review-service.md) — trusting a bookId instead of verifying it, and what that buys
 - [Composing a read across two services](boundaries/composed-reads.md) — joining a book with its reviews at read time, and what the page does when half of it is unavailable
 
+## [Consistency](consistency/) — a fact has to exist on both sides of a boundary, and cannot be current on both
+
+- [The rating copy](consistency/rating-copy.md) — book-service holds a number review-service owns, how stale it may be, and who moves it
+
 ## [Overload](overload/) — more work arrives than can be done, and the queue does the damage
 
 - [Load shedding in auth-service](overload/load-shedding.md) — refusing work we cannot finish in time

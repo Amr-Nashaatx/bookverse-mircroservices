@@ -1,12 +1,13 @@
 import { ApiResponse, authenticateUser, ForbiddenError, ValidationError } from '@bookverse/shared';
 import { bookService } from '../services/book.service.js';
 import {
-    BookListResponseSchema,
+    BookPageResponseSchema,
     BookResponseSchema,
     UpdateBookInput,
     UpdateBookSchema,
     CreateBookSchema,
     UpdateBookParamsSchema,
+    ListBooksQuerySchema,
 } from '../schemas/book.schemas.js';
 import { FastifyTypeboxInstance } from '../types/fastify.js';
 import crypto from 'node:crypto';
@@ -15,13 +16,18 @@ export async function bookRoutes(fastify: FastifyTypeboxInstance) {
     /*
         PUBLIC (at the gateway): no user identity required.
         Still sits behind verifyGatewaySecret at the service — the gateway is the only caller.
-        Input:  none
-        Output: list of books
+        Input:  filters + page (ListBooksQuerySchema)
+        Output: one page of PUBLISHED books
     */
-    fastify.get('/', { schema: { response: { 200: BookListResponseSchema } } }, async (_request, reply) => {
-        const books = await bookService.listBooks();
-        reply.status(200).send(new ApiResponse('books fetched', books));
-    });
+    fastify.get(
+        '/',
+        { schema: { response: { 200: BookPageResponseSchema }, querystring: ListBooksQuerySchema } },
+        async (request, reply) => {
+            const query = request.query;
+            const booksPage = await bookService.listBooks(query);
+            reply.status(200).send(new ApiResponse('books fetched', booksPage));
+        },
+    );
 
     /*
         PUBLIC (at the gateway): fetch a single book by id.
@@ -71,7 +77,8 @@ export async function bookRoutes(fastify: FastifyTypeboxInstance) {
 
             // ownership check
             const book = await bookService.getBook(bookId);
-            if (book.ownerUserId !== ownerUserId) throw new ForbiddenError('You do not have permission for this action');
+            if (book.ownerUserId !== ownerUserId)
+                throw new ForbiddenError('You do not have permission for this action');
 
             const updated = await bookService.updateBook(bookId, bookUpdateData);
             reply.send(new ApiResponse('Book updated'));

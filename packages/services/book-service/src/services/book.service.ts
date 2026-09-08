@@ -1,7 +1,7 @@
-import { ConflictError, NotFoundError } from '@bookverse/shared';
+import { ConflictError, NotFoundError, Page, toPage, toSkipTake } from '@bookverse/shared';
 import { bookRepository } from '../repositories/book.repository.js';
 import type { Book } from '../generated/prisma/index.js';
-import type { BookData, CreateBookInput, UpdateBookInput } from '../schemas/book.schemas.js';
+import type { BookData, CreateBookInput, ListBooksQuery, UpdateBookInput } from '../schemas/book.schemas.js';
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/client';
 import { keyRepository } from '../repositories/key.repository.js';
 
@@ -21,14 +21,33 @@ function serialize(book: Book): BookData {
     };
 }
 
+/*
+ * How far the pager can count before it gives up and says "500+". 50 pages at
+ * the default limit of 10 -- past that nobody is reading, they are refining.
+ */
+const COUNT_CAP = 500;
+
 type CreateBookOutcome = {
     replayed: boolean;
     book: BookData;
 };
 export const bookService = {
-    async listBooks(): Promise<BookData[]> {
-        const books = await bookRepository.findBooks();
-        return books.map(serialize);
+    /*
+     * The count is capped, so its cost does not grow with the table -- and it
+     * runs alongside the page query, so it costs no wall-clock time either.
+     * Past the cap the pager says "50+ pages" instead of lying about the last one.
+     */
+    async listBooks(query: ListBooksQuery): Promise<Page<BookData>> {
+        const filters = { genre: query.genre, q: query.q };
+        const pageQuery = { page: query.page, limit: query.limit, sort: query.sort, order: query.order };
+
+        const { skip, take } = toSkipTake(pageQuery);
+        const [rows, total] = await Promise.all([
+            bookRepository.findBooks(filters, { skip, take, sort: pageQuery.sort, order: pageQuery.order }),
+            bookRepository.countBooks(filters, COUNT_CAP),
+        ]);
+
+        return { ...toPage(rows.map(serialize), pageQuery), total, totalIsExact: total < COUNT_CAP };
     },
 
     async getBook(id: string): Promise<BookData> {

@@ -21,8 +21,11 @@ model Book {
   publishedAt   DateTime?
   createdAt     DateTime   @default(now())
   updatedAt     DateTime   @updatedAt
+  // TODO: one index per allowed sort field, confirmed with EXPLAIN. An
+  // unindexed sort silently becomes a full sort of the table.
 
   @@index([ownerUserId])
+  @@index([title])
 }
 
 enum BookStatus {
