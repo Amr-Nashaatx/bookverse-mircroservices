@@ -1,16 +1,16 @@
-### BookVerse — review-service (Lesson 05, Build 2).
-### The seam: reviews are their own service, and a bookId is taken on trust.
-### Covers the happy path, the ownership checks, the one-review-per-book
-### constraint, and what happens when book-service is gone.
+### REVIEW SERVICE  ·  http://localhost:3000/reviews
 ###
-### Run requests.http first — you need a logged-in user and a real book id.
-### Requires the "REST Client" VS Code extension.
+### review-service has no dependency on book-service in either direction: a
+### bookId is taken on trust. One review per (book, user), enforced by a unique
+### index — so a repeated submit conflicts instead of duplicating, which is why
+### there is no Idempotency-Key here.
 
 @baseUrl = http://localhost:3000
 @email = amr@example.com
 @password = password123
 
-### 1. Log in — reviews writes need a real identity
+
+### Log in
 # @name login
 POST {{baseUrl}}/auth/login
 Content-Type: application/json
@@ -20,150 +20,63 @@ Content-Type: application/json
   "password": "{{password}}"
 }
 
-###
 @accessToken = {{login.response.body.data.tokens.accessToken}}
 
-### 2. Create a book to review (owner = the logged-in user)
+
+### A book to review
 # @name createBook
 POST {{baseUrl}}/books
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 Idempotency-Key: {{$guid}}
 
-{
-  "title": "The Seam",
-  "description": "A book that exists, so we can review it.",
-  "genre": ["non-fiction"]
-}
+{ "title": "The Seam", "description": "A book that exists, so we can review it.", "genre": ["non-fiction"] }
 
-###
 @bookId = {{createBook.response.body.data.id}}
 
-### ---------------------------------------------------------------
-### HAPPY PATH
-### ---------------------------------------------------------------
 
-### 3a. POST /reviews — create. → 201
+### ── WRITES ──────────────────────────────────────────────────────
+
+### Create  →  201
 # @name createReview
 POST {{baseUrl}}/reviews
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
-{
-  "bookId": "{{bookId}}",
-  "rating": 4,
-  "comment": "Held together better than expected."
-}
+{ "bookId": "{{bookId}}", "rating": 5, "comment": "Held up under partition." }
 
-###
 @reviewId = {{createReview.response.body.data.id}}
 
-### 3b. GET /reviews?bookId= — PUBLIC, no token. → 200, one review
-GET {{baseUrl}}/reviews?bookId={{bookId}}
 
-### 3c. GET /reviews/:id — PUBLIC. → 200
-GET {{baseUrl}}/reviews/{{reviewId}}
+### Same user, same book, again  →  409
+### The unique index is what makes the retry safe.
+POST {{baseUrl}}/reviews
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
 
-### 3d. PATCH /reviews/:id — OWNER edits own review. → 200
+{ "bookId": "{{bookId}}", "rating": 3, "comment": "Second opinion." }
+
+
+### Update — author only  →  200
 PATCH {{baseUrl}}/reviews/{{reviewId}}
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
-{
-  "rating": 5,
-  "comment": "Revised upward after a second read."
-}
+{ "rating": 4 }
 
-### ---------------------------------------------------------------
-### THE CONSTRAINT — one review per user per book
-### ---------------------------------------------------------------
 
-### 4. Same user, same book, second review. → 409 Conflict
-### This is also why there is no Idempotency-Key on this route: a repeated
-### submit conflicts instead of duplicating, so the retry is already safe.
-POST {{baseUrl}}/reviews
-Authorization: Bearer {{accessToken}}
-Content-Type: application/json
+### ── READS ───────────────────────────────────────────────────────
 
-{
-  "bookId": "{{bookId}}",
-  "rating": 1,
-  "comment": "Trying to review the same book twice."
-}
+### A book's reviews  →  200.  bookId is required.
+GET {{baseUrl}}/reviews?bookId={{bookId}}
 
-### ---------------------------------------------------------------
-### VALIDATION
-### ---------------------------------------------------------------
 
-### 5a. rating out of range. → 400
-POST {{baseUrl}}/reviews
-Authorization: Bearer {{accessToken}}
-Content-Type: application/json
+### One review  →  200
+GET {{baseUrl}}/reviews/{{reviewId}}
 
-{
-  "bookId": "{{bookId}}",
-  "rating": 9,
-  "comment": "Off the scale."
-}
 
-### 5b. No token on a write. → 401
-POST {{baseUrl}}/reviews
-Content-Type: application/json
+### ── CLEANUP ─────────────────────────────────────────────────────
 
-{
-  "bookId": "{{bookId}}",
-  "rating": 3
-}
-
-### ---------------------------------------------------------------
-### THE SEAM — a bookId that points at nothing
-### ---------------------------------------------------------------
-
-### 6. Review a book that does not exist. → 201
-###    This is the soft dependency, visible. review-service never asks
-###    book-service whether the book is real, so the review is accepted and
-###    now references nothing. That is the deliberate choice, not an oversight.
-POST {{baseUrl}}/reviews
-Authorization: Bearer {{accessToken}}
-Content-Type: application/json
-
-{
-  "bookId": "00000000-0000-0000-0000-000000000000",
-  "rating": 5,
-  "comment": "Reviewing a book that was never written."
-}
-
-### ---------------------------------------------------------------
-### TRUST BOUNDARY (Lesson 01) — direct to review-service, no gateway secret
-### ---------------------------------------------------------------
-###
-###   docker compose exec -T gateway wget -S -O- \
-###     --header='Content-Type: application/json' \
-###     --header='x-user-id: 11111111-1111-1111-1111-111111111111' \
-###     --header='x-user-role: USER' \
-###     --header='x-user-email: forged@evil.test' \
-###     --post-data='{"bookId":"00000000-0000-0000-0000-000000000000","rating":5}' \
-###     http://review-service:3003/reviews 2>&1 | head -n 20
-###
-### Expect 401: the gateway is the only caller review-service accepts.
-
-### ---------------------------------------------------------------
-### WHAT THE BOUNDARY COSTS — measured, then decided
-### ---------------------------------------------------------------
-###
-### The hard path (verify the book on every write) was built, measured and
-### then removed. The numbers that justified removing it live in
-### docs/decisions/boundaries/review-service.md: ~4 ms and ~16% of write
-### capacity at c=1, and — the decisive one — with book-service stopped the
-### hard path returned 503 in 1.035 s while the soft path returned 201 in
-### 0.017 s. Faster when the dependency is down, because a call that never
-### needed to happen is skipped.
-###
-### review-service now has NO dependency on book-service, in either direction.
-### Worth knowing before Lesson 06 Build 1: if the composer ends up inside
-### book-service, book → review becomes a live call, and re-adding a call the
-### other way would then close a cycle.
-
-### 7. Cleanup — owner deletes own review. → 204
+### Delete — author only  →  204
 DELETE {{baseUrl}}/reviews/{{reviewId}}
 Authorization: Bearer {{accessToken}}

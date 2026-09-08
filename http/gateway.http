@@ -1,0 +1,61 @@
+### GATEWAY  ·  http://localhost:3000
+###
+### Everything above is proxied. These two routes are the gateway's own.
+###
+### GET /books/:id/page composes a book with its reviews at read time, and the
+### two dependencies are NOT symmetric:
+###   book-service    REQUIRED  — no book, no page
+###   review-service  OPTIONAL  — the page renders without it, reviews marked
+###                               "unavailable" (which is not the same as none)
+###
+### Fixtures: run books.http and reviews.http first, or reuse a known id.
+
+@baseUrl = http://localhost:3000
+@email = amr@example.com
+@password = password123
+
+
+### Health  →  200
+GET {{baseUrl}}/health
+
+
+### Log in + a book with a review, so the page has something to compose
+# @name login
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{ "email": "{{email}}", "password": "{{password}}" }
+
+@accessToken = {{login.response.body.data.tokens.accessToken}}
+
+###
+# @name pageBook
+POST {{baseUrl}}/books
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+Idempotency-Key: {{$guid}}
+
+{ "title": "Composed Page Fixture", "description": "Has at least one review.", "genre": ["test"] }
+
+@bookId = {{pageBook.response.body.data.id}}
+
+###
+POST {{baseUrl}}/reviews
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{ "bookId": "{{bookId}}", "rating": 5, "comment": "Composed." }
+
+
+### The composed page  →  200, book + reviews in one response
+GET {{baseUrl}}/books/{{bookId}}/page
+
+
+### Degraded: stop review-service, then resend the request above.
+### Expect 200 with reviews marked unavailable — NOT an empty array, which
+### would assert "this book has no reviews".
+###   docker stop review-service   →  resend  →  docker start review-service
+
+
+### Missing book  →  404, because book-service is the required half
+GET {{baseUrl}}/books/00000000-0000-0000-0000-000000000000/page

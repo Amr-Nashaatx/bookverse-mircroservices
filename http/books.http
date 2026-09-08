@@ -1,0 +1,106 @@
+### BOOK SERVICE  ·  http://localhost:3000/books
+###
+### Reads are public at the gateway; writes need a token.
+###
+### NOTE: a new book is DRAFT, and GET /books serves the PUBLISHED catalogue
+### only — so a book you create here will not appear in the browse list until
+### something publishes it. That is deliberate, not a bug.
+
+@baseUrl = http://localhost:3000
+@email = amr@example.com
+@password = password123
+
+
+### Log in — writes below need the token
+# @name login
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{email}}",
+  "password": "{{password}}"
+}
+
+@accessToken = {{login.response.body.data.tokens.accessToken}}
+
+
+### ── WRITES ──────────────────────────────────────────────────────
+
+### Create  →  201.  Idempotency-Key is required; resend the same one to replay.
+# @name createBook
+POST {{baseUrl}}/books
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+Idempotency-Key: {{$guid}}
+
+{
+  "title": "Distributed Systems for Skeptics",
+  "description": "A field guide to partial failure.",
+  "genre": ["non-fiction", "engineering"]
+}
+
+@bookId = {{createBook.response.body.data.id}}
+
+
+### Create without a token  →  401
+POST {{baseUrl}}/books
+Content-Type: application/json
+Idempotency-Key: {{$guid}}
+
+{ "title": "No token", "description": "Should not be created.", "genre": [] }
+
+
+### Update — owner only  →  200
+PATCH {{baseUrl}}/books/{{bookId}}
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{ "description": "A field guide to partial failure. Second edition." }
+
+
+### ── READS ───────────────────────────────────────────────────────
+
+### One book  →  200
+GET {{baseUrl}}/books/{{bookId}}
+
+
+### ── BROWSE: filter · sort · paginate ────────────────────────────
+###
+### Defaults: page=1, limit=10, sort=publishedAt, order=desc.
+### total is a real count up to 500; past that totalIsExact goes false and the
+### pager should read "50+ pages" rather than claim a last page.
+
+### Everything (defaults)  →  200
+GET {{baseUrl}}/books
+
+
+### Filter by genre — repeat the param for more than one
+GET {{baseUrl}}/books?genre=fantasy&genre=engineering
+
+
+### Search titles (case-insensitive, substring)
+GET {{baseUrl}}/books?q=distributed
+
+
+### Sort + page
+GET {{baseUrl}}/books?sort=title&order=asc&page=2&limit=5
+
+
+### Everything at once
+GET {{baseUrl}}/books?genre=engineering&q=systems&sort=title&order=asc&page=1&limit=5
+
+
+### ── BROWSE: what must be refused ────────────────────────────────
+
+### limit above the cap  →  400  ("must be <= 50")
+### An unbounded limit is a free denial of service, not a typo.
+GET {{baseUrl}}/books?limit=51
+
+
+### sort on a column that is not on the allowlist  →  400
+### sort names a column, so the allowlist is the whole defence.
+GET {{baseUrl}}/books?sort=ownerUserId
+
+
+### page 0  →  400
+GET {{baseUrl}}/books?page=0
