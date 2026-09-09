@@ -1,36 +1,21 @@
 /*
- * Seeds browsable data: real login-able users, published books, and reviews.
+ * Seeds login-able users, published books and reviews, straight to the
+ * databases. Not through the API: there is no publish path, so every book the
+ * API creates is DRAFT and invisible to GET /books.
  *
- * Writes STRAIGHT TO THE DATABASES, not through the API. Not for speed — the
- * API cannot produce a browsable book. There is no publish path, so every book
- * it creates is DRAFT and invisible to GET /books, which is the endpoint this
- * data exists to exercise.
+ * books_db and reviews_db are separate with no foreign key, so book ids are
+ * generated here and reviews reference them.
  *
- * books_db and reviews_db are separate databases with no foreign key between
- * them, so book ids are generated here first and reviews reference them. That
- * constraint is the service boundary, not an inconvenience.
+ * The shape matters more than the volume — duplicate titles exercise the id
+ * tiebreaker, DRAFT rows the status filter, null publish dates the NULLS LAST
+ * placement, uneven review counts hasMore.
  *
- * The SHAPE matters more than the volume. A thousand identical books prove
- * nothing, so the distribution is built to make each decision visible:
- *   - duplicate titles          -> the `id` tiebreaker in ORDER BY
- *   - DRAFT / ARCHIVED rows     -> the hard-wired status filter
- *   - PUBLISHED with no date    -> the `nulls: 'last'` placement
- *   - a small genre pool        -> ?genre= returning a real subset
- *   - repeated title words      -> ?q= returning a real subset
- *   - very uneven review counts -> hasMore, and load-more paging
+ * Seeded rows are marked and nothing else is touched: users by an
+ * @bookverse.test email, books by a "seed" genre, reviews by their book.
  *
- * Seeded rows are marked so they can be removed again:
- *   users  email ends in @bookverse.test
- *   books  genre contains "seed"
- *   reviews  belong to a seeded book
- * Nothing else is ever touched, and --clean removes only those.
- *
- * Usage:
- *   npm run seed
- *   npm run seed -- --books=1000 --reviews=8000 --users=60
- *   npm run seed -- --clean
- *
- * Requires a running Postgres (`npm run compose`).
+ * Usage:  npm run seed
+ *         npm run seed -- --books=1000 --reviews=8000 --users=60
+ *         npm run seed -- --clean
  */
 import { randomUUID } from 'node:crypto';
 import bcrypt from 'bcryptjs';
@@ -53,7 +38,7 @@ const options = {
     books: Number(flag('books', 200)),
     reviews: Number(flag('reviews', 1000)),
     users: Number(flag('users', 30)),
-    // Your own account joins the pool so some seeded rows are yours to edit.
+    // Your account joins the pool, so some seeded rows are yours to edit.
     me: flag('me', 'amr@example.com'),
     clean: argv.includes('--clean'),
 };
@@ -61,8 +46,7 @@ const options = {
 const SEED_MARKER = 'seed';
 const SEED_EMAIL_DOMAIN = '@bookverse.test';
 const SEED_PASSWORD = 'password123';
-/* How many pool entries your own account gets. Everyone else gets one, so at 6
- * you own roughly six times as many seeded books as any single fake user. */
+/* Pool entries for your account; everyone else gets one. */
 const MY_WEIGHT = 6;
 
 // ── content pools ────────────────────────────────────────────────────────────
@@ -72,9 +56,7 @@ const GENRES = ['fantasy', 'sci-fi', 'mystery', 'romance', 'history', 'engineeri
 const ADJECTIVES = ['Distributed', 'Silent', 'Broken', 'Last', 'Hidden', 'Crimson', 'Patient', 'Eternal', 'Frozen', 'Restless'];
 const NOUNS = ['Systems', 'Garden', 'Protocol', 'Empire', 'Machine', 'Harvest', 'Cathedral', 'Voyage', 'Archive', 'Tide'];
 
-/* Deliberate collisions. A slice of the catalogue gets one of these exact
- * titles, so `?sort=title` has real ties to break and the page-boundary check
- * has something to catch. */
+/* Deliberate collisions, so ?sort=title has real ties to break. */
 const DUPLICATE_TITLES = ['The Same Title', 'Common Ground', 'Untitled'];
 
 const COMMENTS = [
@@ -110,8 +92,8 @@ async function clean() {
     const seeded = await books.book.findMany({ where: { genre: { has: SEED_MARKER } }, select: { id: true } });
     const bookIds = seeded.map((b) => b.id);
 
-    // Reviews first: nothing enforces this order, but leaving reviews pointing
-    // at deleted books is exactly the orphan state the missing FK allows.
+    // Reviews first — nothing enforces the order, and the missing FK would
+    // happily leave them orphaned.
     const deletedReviews = await reviews.review.deleteMany({ where: { bookId: { in: bookIds } } });
     const deletedBooks = await books.book.deleteMany({ where: { genre: { has: SEED_MARKER } } });
     // Sessions cascade from User.
@@ -123,9 +105,8 @@ async function clean() {
 // ── users ────────────────────────────────────────────────────────────────────
 
 async function seedUsers() {
-    /* One hash, reused for every seeded account. bcrypt salts per call, so this
-     * would be wrong for real credentials — here every account shares one
-     * published password anyway, and it turns N hashes into one. */
+    /* One hash for every account. Wrong for real credentials; here they all
+     * share one published password anyway, and it turns N hashes into one. */
     const password = await bcrypt.hash(SEED_PASSWORD, 10);
 
     const rows = Array.from({ length: options.users }, (_, i) => {
@@ -149,8 +130,7 @@ async function seedUsers() {
 
     const me = await auth.user.findUnique({ where: { email: options.me }, select: { id: true, email: true } });
 
-    // The pool is a plain array and weighting is repetition — the simplest
-    // thing that makes `pick()` favour you without a second code path.
+    // Weighting is just repetition, so pick() favours you with no extra path.
     const pool = seeded.map((u) => u.id);
     if (me) for (let i = 0; i < MY_WEIGHT; i++) pool.push(me.id);
 
@@ -163,14 +143,11 @@ function makeBook(index, ownerUserId) {
     const duplicate = Math.random() < 0.08;
     const title = duplicate ? pick(DUPLICATE_TITLES) : `The ${pick(ADJECTIVES)} ${pick(NOUNS)}`;
 
-    // Roughly 15% never reach the catalogue, so the status filter is visibly
-    // doing something rather than filtering nothing.
+    // ~15% never reach the catalogue, so the status filter visibly does something.
     const roll = Math.random();
     const status = roll < 0.12 ? 'DRAFT' : roll < 0.15 ? 'ARCHIVED' : 'PUBLISHED';
 
-    /* A few published books carry no publish date. Null means "we were never
-     * told", not "published long ago" — and where those sort is a decision the
-     * repository makes explicitly. */
+    /* A few published books have no date — null is "never told", not "long ago". */
     const datedPublished = status === 'PUBLISHED' && Math.random() > 0.05;
     const publishedAt = datedPublished ? new Date(Date.now() - between(0, 1095) * 86_400_000) : null;
 
@@ -197,8 +174,7 @@ async function seedBooks(pool) {
 
 // ── reviews ──────────────────────────────────────────────────────────────────
 
-/* Deliberately lopsided: most books have almost nothing, a few carry dozens.
- * A flat 5-per-book would never exercise hasMore or a second page. */
+/* Lopsided on purpose — a flat 5-per-book never exercises hasMore. */
 function reviewCount() {
     const r = Math.random();
     if (r < 0.45) return 0;
@@ -208,8 +184,7 @@ function reviewCount() {
 }
 
 function seedReviewsFor(book, pool, budget, taken) {
-    // @@unique([bookId, userId]) — one review per reader per book, so a book's
-    // count can never exceed the number of distinct users available.
+    // @@unique([bookId, userId]) caps a book at one review per reader.
     const used = taken.get(book.id);
     const free = pool.filter((id) => !used.has(id));
     const wanted = Math.min(reviewCount(), free.length, budget);
@@ -236,12 +211,8 @@ async function seedReviews(bookRows, pool) {
     const readers = [...new Set(pool)];
     const taken = new Map(candidates.map((b) => [b.id, new Set()]));
 
-    /*
-     * Repeated passes, because one skewed pass runs out of books long before it
-     * runs out of budget — 45% of books draw zero. Each pass tops up whatever
-     * capacity is left until the budget is spent or every book is saturated,
-     * so --reviews means what it says.
-     */
+    /* Repeated passes: one skewed pass runs out of books long before budget,
+     * since 45% draw zero. Tops up until spent or saturated. */
     const rows = [];
     let exhausted = false;
     while (rows.length < options.reviews && !exhausted) {
@@ -250,7 +221,7 @@ async function seedReviews(bookRows, pool) {
             if (rows.length >= options.reviews) break;
             rows.push(...seedReviewsFor(book, readers, options.reviews - rows.length, taken));
         }
-        // A whole pass that added nothing means every book is at capacity.
+        // A pass that added nothing means every book is at capacity.
         exhausted = rows.length === before;
     }
 
@@ -265,8 +236,7 @@ async function seedReviews(bookRows, pool) {
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
-/* One INSERT per chunk instead of one per row — the difference between a few
- * seconds and a few thousand round trips. */
+/* One INSERT per chunk instead of thousands of round trips. */
 async function createInChunks(model, rows, size = 500) {
     for (let i = 0; i < rows.length; i += size) {
         await model.createMany({ data: rows.slice(i, i + size), skipDuplicates: true });

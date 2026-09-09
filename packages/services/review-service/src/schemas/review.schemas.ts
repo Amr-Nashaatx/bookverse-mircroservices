@@ -8,10 +8,8 @@ export const ReviewParamsSchema = Type.Object({
 
 export const ReviewSortFields = ['createdAt', 'rating'] as const;
 
-/*
- * `bookId` is required: this endpoint lists one book's reviews, never all of
- * them. The page half is the same contract book-service answers with.
- */
+/* `bookId` required — one book's reviews, never all of them. The page half is
+ * the same contract book-service answers with. */
 export const ListReviewsQuerySchema = Type.Object({
     bookId: Type.String({ format: 'uuid' }),
     ...pageQueryProps({ sortFields: ReviewSortFields, defaultSort: 'createdAt', defaultLimit: 10, maxLimit: 50 }),

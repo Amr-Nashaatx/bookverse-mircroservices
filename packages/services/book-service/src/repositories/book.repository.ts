@@ -12,31 +12,20 @@ type BookSortField = (typeof BookSortFields)[number];
 type PageOptions = { take: number; skip: number; sort: BookSortField; order: Prisma.SortOrder };
 
 /*
- * Every sort ends with `id`. Without that tiebreaker, ORDER BY title with two
- * equal titles lets Postgres order the tie differently between two queries, so
- * page 2 slices a different sequence than page 1 did -- one book appears twice,
- * another never.
+ * Every sort ends with `id`. Without it, tied titles order differently between
+ * two queries and a book lands on both pages or neither.
  *
- * publishedAt is the only nullable sort field, so it is the only one that needs
- * its NULLs placed; Prisma does not accept a `nulls` option on a NOT NULL
- * column. Unknown dates go last in both directions: "never published" is not
- * "published long ago".
- *
- * The switch is exhaustive on purpose -- add a field to BookSortFields and this
- * stops compiling until you have said where its nulls belong.
+ * publishedAt is the only nullable field, so the only one needing its NULLs
+ * placed; they go last either way — "never published" is not "published long
+ * ago". The switch is exhaustive so a new sort field cannot skip this.
  */
 /*
- * One source of truth for the predicate: the page and the count must see the
- * same rows, and two copies of this drift without anything failing.
+ * One predicate for both the page and the count — two copies drift without
+ * anything failing.
  *
- * `status: 'PUBLISHED'` is hard-wired, not a parameter. This endpoint is
- * public, so a client must not be able to ask for anyone's DRAFT -- and the way
- * to guarantee that is for no parameter to reach this line at all.
- *
- * An absent filter must be `undefined`, never `null`: Prisma reads undefined as
- * "do not filter on this field" and null as "match rows where it IS null". An
- * empty genre array is also "no filter" -- `hasSome: []` matches nothing, which
- * is the opposite of what an empty filter means.
+ * PUBLISHED is hard-wired: no parameter reaches it, so no client can ask for
+ * someone's DRAFT. An absent filter must be `undefined` (no filter), never
+ * `null` (match nulls); `hasSome: []` matches nothing, so guard on length.
  */
 function buildWhere(filters: BookFilters): Prisma.BookWhereInput {
     return {
@@ -86,14 +75,11 @@ export const bookRepository = {
     },
 
     /*
-     * A count that stops early. Prisma renders `take` as
-     * COUNT(*) FROM (SELECT id ... LIMIT cap), so the work is capped at `cap`
-     * matching rows however large the table grows -- which is what makes a
-     * pager affordable.
+     * A count that stops early: `take` becomes LIMIT, so the work is capped
+     * however large the table grows.
      *
-     * The cap bounds MATCHES, not work: a filter that matches almost nothing
-     * still scans until it is sure. An index on the filtered column is what
-     * bounds that half, not this argument.
+     * The cap bounds MATCHES, not work — a filter matching almost nothing still
+     * scans until it is sure. The index bounds that half.
      */
     async countBooks(filters: BookFilters, cap: number) {
         return prisma.book.count({

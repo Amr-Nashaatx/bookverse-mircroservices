@@ -1,9 +1,7 @@
-### REVIEW SERVICE  ·  http://localhost:3000/reviews
-###
-### review-service has no dependency on book-service in either direction: a
-### bookId is taken on trust. One review per (book, user), enforced by a unique
-### index — so a repeated submit conflicts instead of duplicating, which is why
-### there is no Idempotency-Key here.
+### REVIEW SERVICE  ·  /reviews
+### No dependency on book-service either way — a bookId is taken on trust.
+### One review per (book, user), so a repeated submit conflicts instead of
+### duplicating. That is why there is no Idempotency-Key here.
 
 @baseUrl = http://localhost:3000
 @email = amr@example.com
@@ -48,8 +46,7 @@ Content-Type: application/json
 @reviewId = {{createReview.response.body.data.id}}
 
 
-### Same user, same book, again  →  409
-### The unique index is what makes the retry safe.
+### Same user, same book, again  →  409. The unique index makes the retry safe.
 POST {{baseUrl}}/reviews
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
@@ -67,11 +64,10 @@ Content-Type: application/json
 
 ### ── READS ───────────────────────────────────────────────────────
 
-### A book's reviews  →  200.  bookId is required (400 without it).
-### Same page contract book-service answers with: page, limit, sort, order.
-### Defaults: page=1, limit=10, sort=createdAt, order=desc.
-### No count query here — this list is a "load more" button, so `hasMore` is
-### the only question it asks. `total` is a free lower bound.
+### A book's reviews  →  200 (400 without bookId).
+### Same page contract as book-service. Defaults: sort=createdAt, order=desc.
+### No count query — a "load more" button only asks hasMore, so total is a
+### free lower bound.
 GET {{baseUrl}}/reviews?bookId={{bookId}}
 
 

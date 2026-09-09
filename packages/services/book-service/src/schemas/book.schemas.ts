@@ -53,16 +53,9 @@ export type BookData = Static<typeof BookSchema>;
 
 export const BookSortFields = ['title', 'publishedAt', 'createdAt'] as const;
 
-/*
- * Both optional: absent means "do not filter on this", and GET /books with no
- * query string is the main browse page.
- *
- * `genre` repeats -- ?genre=fantasy&genre=scifi. A single value coerces to a
- * one-element array. Commas do NOT split: ?genre=a,b arrives as one element.
- *
- * No `status` on purpose: this endpoint is public and serves the published
- * catalogue only. The filter is hard-wired in book.repository.ts.
- */
+/* Both optional — bare GET /books is the browse page.
+ * `genre` repeats: ?genre=a&genre=b. Commas do not split.
+ * No `status`: public endpoint, published only, hard-wired in the repository. */
 export const bookFilterProps = {
     genre: Type.Optional(Type.Array(Type.String())),
     q: Type.Optional(Type.String()),
@@ -74,8 +67,7 @@ export const ListBooksQuerySchema = Type.Object({
 });
 export type ListBooksQuery = Static<typeof ListBooksQuerySchema>;
 
-/* `pageSchema` comes from shared so this envelope stays identical to the one
- * review-service will answer with. */
+/* pageSchema from shared, so this envelope matches review-service's. */
 export const BookPageResponseSchema = Type.Object({
     timestamp: Type.String({ format: 'date-time' }),
     message: Type.String(),

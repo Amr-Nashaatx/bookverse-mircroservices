@@ -1,10 +1,7 @@
-### BOOK SERVICE  ·  http://localhost:3000/books
-###
-### Reads are public at the gateway; writes need a token.
-###
-### NOTE: a new book is DRAFT, and GET /books serves the PUBLISHED catalogue
-### only — so a book you create here will not appear in the browse list until
-### something publishes it. That is deliberate, not a bug.
+### BOOK SERVICE  ·  /books
+### Reads public, writes need a token.
+### A new book is DRAFT and GET /books serves PUBLISHED only, so what you
+### create here will not appear in the browse list. Deliberate. Use npm run seed.
 
 @baseUrl = http://localhost:3000
 @email = amr@example.com
@@ -26,7 +23,7 @@ Content-Type: application/json
 
 ### ── WRITES ──────────────────────────────────────────────────────
 
-### Create  →  201.  Idempotency-Key is required; resend the same one to replay.
+### Create  →  201. Idempotency-Key required; resend it to replay.
 # @name createBook
 POST {{baseUrl}}/books
 Authorization: Bearer {{accessToken}}
@@ -67,8 +64,7 @@ GET {{baseUrl}}/books/{{bookId}}
 ### ── BROWSE: filter · sort · paginate ────────────────────────────
 ###
 ### Defaults: page=1, limit=10, sort=publishedAt, order=desc.
-### total is a real count up to 500; past that totalIsExact goes false and the
-### pager should read "50+ pages" rather than claim a last page.
+### total is exact up to 500; past that totalIsExact goes false → "50+ pages".
 
 ### Everything (defaults)  →  200
 GET {{baseUrl}}/books
@@ -92,13 +88,12 @@ GET {{baseUrl}}/books?genre=engineering&q=systems&sort=title&order=asc&page=1&li
 
 ### ── BROWSE: what must be refused ────────────────────────────────
 
-### limit above the cap  →  400  ("must be <= 50")
-### An unbounded limit is a free denial of service, not a typo.
+### limit above the cap  →  400. An unbounded limit is a free denial of service.
 GET {{baseUrl}}/books?limit=51
 
 
-### sort on a column that is not on the allowlist  →  400
-### sort names a column, so the allowlist is the whole defence.
+### sort off the allowlist  →  400. sort names a column, so the allowlist is
+### the whole defence.
 GET {{baseUrl}}/books?sort=ownerUserId
 
 

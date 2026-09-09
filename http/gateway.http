@@ -1,14 +1,10 @@
-### GATEWAY  ·  http://localhost:3000
+### GATEWAY  ·  everything else is proxied; these two routes are its own.
 ###
-### Everything above is proxied. These two routes are the gateway's own.
-###
-### GET /books/:id/page composes a book with its reviews at read time, and the
-### two dependencies are NOT symmetric:
-###   book-service    REQUIRED  — no book, no page
-###   review-service  OPTIONAL  — the page renders without it, reviews marked
-###                               "unavailable" (which is not the same as none)
-###
-### Fixtures: run books.http and reviews.http first, or reuse a known id.
+### GET /books/:id/page composes a book with its reviews. The dependencies are
+### NOT symmetric:
+###   book-service    REQUIRED — no book, no page
+###   review-service  OPTIONAL — renders without it, marked "unavailable"
+###                              (which is not the same as none)
 
 @baseUrl = http://localhost:3000
 @email = amr@example.com
@@ -47,17 +43,15 @@ Content-Type: application/json
 { "bookId": "{{bookId}}", "rating": 5, "comment": "Composed." }
 
 
-### The composed page  →  200, book + reviews in one response
-### reviews carries items + hasMore + total. The gateway asks review-service for
-### a fixed number (REVIEWS_ON_PAGE), so one page view can no longer cost
-### whatever the most-reviewed book happens to hold.
+### The composed page  →  200, book + reviews in one response.
+### The gateway asks for a fixed number of reviews, so one page view no longer
+### costs whatever the most-reviewed book happens to hold.
 GET {{baseUrl}}/books/{{bookId}}/page
 
 
-### Degraded: stop review-service, then resend the request above.
-### Expect 200 with reviews marked unavailable — NOT an empty array, which
-### would assert "this book has no reviews".
-###   docker stop review-service   →  resend  →  docker start review-service
+### Degraded: `docker stop review-service`, resend the request above, then
+### start it again. Expect 200 with reviews "unavailable" — NOT an empty array,
+### which would assert the book has no reviews.
 
 
 ### Missing book  →  404, because book-service is the required half

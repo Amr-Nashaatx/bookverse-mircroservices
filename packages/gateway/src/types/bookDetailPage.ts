@@ -24,11 +24,8 @@ export type BookReview = {
     updatedAt: string;
 };
 
-/*
- * review-service answers lists in the shared page envelope. This is the
- * gateway's own copy of that shape -- see the note in bookDetailsHelpers.ts
- * about why nothing keeps it in sync.
- */
+/* The gateway's own copy of review-service's page envelope — see the note in
+ * bookDetailsHelpers.ts on why nothing keeps it in sync. */
 export type ReviewPage = {
     items: BookReview[];
     hasMore: boolean;
@@ -44,11 +41,8 @@ export function isAppError(err: unknown): err is AppError {
 
 export type BookPageResponse = {
     book: BookDetails | undefined;
-    /*
-     * `hasMore` and `total` travel with the items so the page can offer "load
-     * more" without a second call to find out whether there is more. `total` is
-     * a lower bound unless hasMore is false.
-     */
+    /* hasMore travels with the items so the page can offer "load more" without
+     * a second call. total is a lower bound unless hasMore is false. */
     reviews: { status: 'ok'; items: BookReview[]; hasMore: boolean; total: number } | { status: 'unavailable' };
 };
 export type SuccessFetchResult = Extract<FetchResult, { ok: true }>;

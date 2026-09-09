@@ -18,11 +18,8 @@ function serialize(review: Review): ReviewData {
 }
 
 export const reviewService = {
-    /*
-     * No count query. This list is rendered with a "load more" button, which
-     * only ever asks "is there another batch?" -- so `hasMore` is the whole
-     * requirement and `total` stays the free lower bound toPage() computes.
-     */
+    /* No count query: a "load more" button only asks whether another batch
+     * exists, so hasMore is the whole requirement. */
     async listReviewsForBook(query: ListReviewsQuery): Promise<Page<ReviewData>> {
         const pageQuery = { page: query.page, limit: query.limit, sort: query.sort, order: query.order };
         const { skip, take } = toSkipTake(pageQuery);

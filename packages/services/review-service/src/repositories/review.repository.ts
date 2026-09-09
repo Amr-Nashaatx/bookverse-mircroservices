@@ -5,14 +5,8 @@ import { ReviewSortFields } from '../schemas/review.schemas.js';
 type ReviewSortField = (typeof ReviewSortFields)[number];
 export type ReviewPageOptions = { take: number; skip: number; sort: ReviewSortField; order: Prisma.SortOrder };
 
-/*
- * Every sort ends with `id`. Two reviews posted in the same millisecond, or
- * sharing a rating, would otherwise be ordered differently between two queries
- * -- so a review lands on both pages, or on neither.
- *
- * Neither sort field is nullable, so unlike book-service there are no NULLs to
- * place.
- */
+/* Every sort ends with `id`: same-millisecond or same-rating reviews would
+ * otherwise land on both pages, or neither. Neither field is nullable. */
 function buildOrderBy(sort: ReviewSortField, order: Prisma.SortOrder): Prisma.ReviewOrderByWithRelationInput[] {
     switch (sort) {
         case 'createdAt':

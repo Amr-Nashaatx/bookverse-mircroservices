@@ -21,10 +21,8 @@ function serialize(book: Book): BookData {
     };
 }
 
-/*
- * How far the pager can count before it gives up and says "500+". 50 pages at
- * the default limit of 10 -- past that nobody is reading, they are refining.
- */
+/* How far the pager counts before it says "500+". 50 pages at the default
+ * limit — past that nobody is reading, they are refining. */
 const COUNT_CAP = 500;
 
 type CreateBookOutcome = {
@@ -32,11 +30,8 @@ type CreateBookOutcome = {
     book: BookData;
 };
 export const bookService = {
-    /*
-     * The count is capped, so its cost does not grow with the table -- and it
-     * runs alongside the page query, so it costs no wall-clock time either.
-     * Past the cap the pager says "50+ pages" instead of lying about the last one.
-     */
+    /* Capped, so the count's cost does not grow with the table; parallel, so
+     * it costs no wall-clock time. */
     async listBooks(query: ListBooksQuery): Promise<Page<BookData>> {
         const filters = { genre: query.genre, q: query.q };
         const pageQuery = { page: query.page, limit: query.limit, sort: query.sort, order: query.order };

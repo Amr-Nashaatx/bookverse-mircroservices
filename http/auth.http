@@ -1,9 +1,5 @@
-### AUTH SERVICE  ·  http://localhost:3000/auth
-###
-### Identity lives here. Everything else in BookVerse trusts the gateway to
-### have checked a token; this is where the token comes from.
-###
-### Cookies (refreshToken, sessionId) are set by signup/login and resent
+### AUTH SERVICE  ·  /auth
+### Where tokens come from. Cookies are set by signup/login and resent
 ### automatically by the REST Client.
 
 @baseUrl = http://localhost:3000
@@ -11,8 +7,7 @@
 @password = password123
 
 
-### Sign up  →  201, sets cookies, returns user + tokens
-### Already registered?  →  400 "email already exists"
+### Sign up  →  201  ·  already registered → 400
 # @name signup
 POST {{baseUrl}}/auth/signup
 Content-Type: application/json
@@ -37,8 +32,8 @@ Content-Type: application/json
 @accessToken = {{login.response.body.data.tokens.accessToken}}
 
 
-### Wrong password  →  400 "something is wrong with email or password"
-### Deliberately vague: it must not reveal whether the email exists.
+### Wrong password  →  400. Vague on purpose: must not reveal whether the
+### email exists.
 POST {{baseUrl}}/auth/login
 Content-Type: application/json
 
@@ -48,8 +43,7 @@ Content-Type: application/json
 }
 
 
-### Refresh  →  200, new access token from the refreshToken cookie
-### 401 if that cookie is missing — log in above first.
+### Refresh  →  200 from the refreshToken cookie (401 without it)
 POST {{baseUrl}}/auth/refresh
 
 
