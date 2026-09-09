@@ -48,6 +48,9 @@ Content-Type: application/json
 
 
 ### The composed page  →  200, book + reviews in one response
+### reviews carries items + hasMore + total. The gateway asks review-service for
+### a fixed number (REVIEWS_ON_PAGE), so one page view can no longer cost
+### whatever the most-reviewed book happens to hold.
 GET {{baseUrl}}/books/{{bookId}}/page
 
 

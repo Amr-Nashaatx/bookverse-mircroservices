@@ -3,7 +3,7 @@ import { reviewService } from '../services/review.service.js';
 import {
     CreateReviewSchema,
     ListReviewsQuerySchema,
-    ReviewListResponseSchema,
+    ReviewPageResponseSchema,
     ReviewParamsSchema,
     ReviewResponseSchema,
     UpdateReviewInput,
@@ -15,16 +15,15 @@ export async function reviewRoutes(fastify: FastifyTypeboxInstance) {
     /*
         PUBLIC (at the gateway): no user identity required.
         Still sits behind verifyGatewaySecret at the service — the gateway is the only caller.
-        Input:  bookId (query)
-        Output: that book's reviews, newest first
+        Input:  bookId + page (ListReviewsQuerySchema)
+        Output: one page of that book's reviews, newest first
     */
     fastify.get(
         '/',
-        { schema: { querystring: ListReviewsQuerySchema, response: { 200: ReviewListResponseSchema } } },
+        { schema: { querystring: ListReviewsQuerySchema, response: { 200: ReviewPageResponseSchema } } },
         async (request, reply) => {
-            const { bookId } = request.query as { bookId: string };
-            const reviews = await reviewService.listReviewsForBook(bookId);
-            reply.status(200).send(new ApiResponse('reviews fetched', reviews));
+            const reviewsPage = await reviewService.listReviewsForBook(request.query);
+            reply.status(200).send(new ApiResponse('reviews fetched', reviewsPage));
         },
     );
 

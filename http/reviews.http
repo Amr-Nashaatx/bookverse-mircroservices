@@ -67,8 +67,24 @@ Content-Type: application/json
 
 ### ── READS ───────────────────────────────────────────────────────
 
-### A book's reviews  →  200.  bookId is required.
+### A book's reviews  →  200.  bookId is required (400 without it).
+### Same page contract book-service answers with: page, limit, sort, order.
+### Defaults: page=1, limit=10, sort=createdAt, order=desc.
+### No count query here — this list is a "load more" button, so `hasMore` is
+### the only question it asks. `total` is a free lower bound.
 GET {{baseUrl}}/reviews?bookId={{bookId}}
+
+
+### Sorted by rating, second page
+GET {{baseUrl}}/reviews?bookId={{bookId}}&sort=rating&order=desc&page=2&limit=5
+
+
+### limit above the cap  →  400
+GET {{baseUrl}}/reviews?bookId={{bookId}}&limit=51
+
+
+### sort off the allowlist  →  400  (reviews allow createdAt | rating)
+GET {{baseUrl}}/reviews?bookId={{bookId}}&sort=userId
 
 
 ### One review  →  200

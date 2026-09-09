@@ -9,12 +9,21 @@ import { bookServiceBreaker } from '../breakers/book-breaker.js';
 import { reviewServiceBreaker } from '../breakers/review-breaker.js';
 import { classifyOutcome } from '../breakers/classifyOutcome.js';
 
+/* How many reviews the book page shows before "load more". */
+const REVIEWS_ON_PAGE = 10;
+
 export async function bookPageRoutes(fastify: FastifyTypeboxInstance) {
     fastify.get('/books/:id/page', { schema: { params: BookPageParamsSchema } }, async (request, reply) => {
         const bookId = request.params.id;
 
         const bookUrl = `${config.services.book}/${bookId}`;
-        const reviewUrl = `${config.services.review}?bookId=${bookId}`;
+        /*
+         * The limit is stated, not inherited. Before reviews were paginated this
+         * call fetched every review a book had, so one page view cost whatever
+         * the most-reviewed book happened to hold. A number here is a cap on
+         * what this page can ask of review-service.
+         */
+        const reviewUrl = `${config.services.review}?bookId=${bookId}&limit=${REVIEWS_ON_PAGE}`;
 
         let specs: RequestSpec[] = [
             { id: 'book', url: bookUrl, timeoutMs: 1000, breaker: bookServiceBreaker },

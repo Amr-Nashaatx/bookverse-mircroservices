@@ -1,8 +1,8 @@
-import { ConflictError, ForbiddenError, NotFoundError } from '@bookverse/shared';
+import { ConflictError, ForbiddenError, NotFoundError, Page, toPage, toSkipTake } from '@bookverse/shared';
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/client';
 import type { Review } from '../generated/prisma/index.js';
 import { reviewRepository } from '../repositories/review.repository.js';
-import type { CreateReviewInput, ReviewData, UpdateReviewInput } from '../schemas/review.schemas.js';
+import type { CreateReviewInput, ListReviewsQuery, ReviewData, UpdateReviewInput } from '../schemas/review.schemas.js';
 
 // Shape a Prisma Review (with Date objects) into the serializable response DTO.
 function serialize(review: Review): ReviewData {
@@ -18,9 +18,22 @@ function serialize(review: Review): ReviewData {
 }
 
 export const reviewService = {
-    async listReviewsForBook(bookId: string): Promise<ReviewData[]> {
-        const reviews = await reviewRepository.findReviewsByBookId(bookId);
-        return reviews.map(serialize);
+    /*
+     * No count query. This list is rendered with a "load more" button, which
+     * only ever asks "is there another batch?" -- so `hasMore` is the whole
+     * requirement and `total` stays the free lower bound toPage() computes.
+     */
+    async listReviewsForBook(query: ListReviewsQuery): Promise<Page<ReviewData>> {
+        const pageQuery = { page: query.page, limit: query.limit, sort: query.sort, order: query.order };
+        const { skip, take } = toSkipTake(pageQuery);
+
+        const reviews = await reviewRepository.findReviewsByBookId(query.bookId, {
+            skip,
+            take,
+            sort: pageQuery.sort,
+            order: pageQuery.order,
+        });
+        return toPage(reviews.map(serialize), pageQuery);
     },
 
     async getReview(id: string): Promise<ReviewData> {

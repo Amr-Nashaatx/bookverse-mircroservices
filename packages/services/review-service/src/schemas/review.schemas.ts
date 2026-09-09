@@ -1,3 +1,4 @@
+import { pageQueryProps, pageSchema } from '@bookverse/shared';
 import { Type, Static } from '@sinclair/typebox';
 
 // Request Params Schemas
@@ -5,9 +6,17 @@ export const ReviewParamsSchema = Type.Object({
     id: Type.String({ format: 'uuid' }),
 });
 
+export const ReviewSortFields = ['createdAt', 'rating'] as const;
+
+/*
+ * `bookId` is required: this endpoint lists one book's reviews, never all of
+ * them. The page half is the same contract book-service answers with.
+ */
 export const ListReviewsQuerySchema = Type.Object({
     bookId: Type.String({ format: 'uuid' }),
+    ...pageQueryProps({ sortFields: ReviewSortFields, defaultSort: 'createdAt', defaultLimit: 10, maxLimit: 50 }),
 });
+export type ListReviewsQuery = Static<typeof ListReviewsQuerySchema>;
 
 // Request Schemas
 export const CreateReviewSchema = Type.Object({
@@ -39,10 +48,10 @@ export const ReviewResponseSchema = Type.Object({
     data: Type.Optional(ReviewSchema),
 });
 
-export const ReviewListResponseSchema = Type.Object({
+export const ReviewPageResponseSchema = Type.Object({
     timestamp: Type.String({ format: 'date-time' }),
     message: Type.String(),
-    data: Type.Optional(Type.Array(ReviewSchema)),
+    data: Type.Optional(pageSchema(ReviewSchema)),
 });
 
 // Inferred types

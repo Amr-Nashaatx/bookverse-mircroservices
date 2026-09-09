@@ -5,6 +5,7 @@ import {
     BookReview,
     FailedFetchResult,
     isAppError,
+    ReviewPage,
     SuccessFetchResult,
 } from '../types/bookDetailPage.js';
 
@@ -21,7 +22,10 @@ import {
 export function addFetchedData(result: SuccessFetchResult, target: BookPageResponse) {
     const specId = result.specId;
     if (specId === 'book') target.book = result.data.data as BookDetails;
-    else if (specId === 'reviews') target.reviews = { status: 'ok', items: result.data.data as BookReview[] };
+    else if (specId === 'reviews') {
+        const page = result.data.data as ReviewPage;
+        target.reviews = { status: 'ok', items: page.items, hasMore: page.hasMore, total: page.total };
+    }
 }
 
 /*

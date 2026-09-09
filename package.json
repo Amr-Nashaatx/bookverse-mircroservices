@@ -16,6 +16,7 @@
         "studio:books": "node scripts/studio.mjs books",
         "studio:reviews": "node scripts/studio.mjs reviews",
         "sweep": "node scripts/sweep.mjs",
+        "seed": "node scripts/seed.mjs",
         "logs:gateway": "node scripts/logs.mjs gateway",
         "logs:auth": "node scripts/logs.mjs auth",
         "logs:book": "node scripts/logs.mjs book",
