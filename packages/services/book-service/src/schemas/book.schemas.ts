@@ -51,7 +51,7 @@ export type CreateBookInput = Static<typeof CreateBookSchema>;
 export type UpdateBookInput = Static<typeof UpdateBookSchema>;
 export type BookData = Static<typeof BookSchema>;
 
-export const BookSortFields = ['title', 'publishedAt', 'createdAt'] as const;
+export const BookSortFields = ['title', 'publishedAt', 'createdAt', 'rating'] as const;
 
 /* Both optional — bare GET /books is the browse page.
  * `genre` repeats: ?genre=a&genre=b. Commas do not split.

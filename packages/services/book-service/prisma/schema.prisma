@@ -8,23 +8,30 @@ datasource db {
 }
 
 model Book {
-  id            String     @id @default(uuid())
-  title         String
+  id                 String     @id @default(uuid())
+  title              String
   // The user who created the book. Ownership checks compare this to request.user.id.
   // Named for the User it points at, not for the "author" role: an Author is a
   // separate thing (pen name, approval status) that this service does not know about.
-  ownerUserId   String
-  genre         String[]
-  description   String
-  coverImageUrl String?
-  status        BookStatus @default(DRAFT)
-  publishedAt   DateTime?
-  createdAt     DateTime   @default(now())
-  updatedAt     DateTime   @updatedAt
-  // TODO: an index per sort field — unindexed sorts scan the whole table.
+  ownerUserId        String
+  genre              String[]
+  description        String
+  coverImageUrl      String?
+  status             BookStatus @default(DRAFT)
+  publishedAt        DateTime?
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
+  reviewsAvgRating   Float?
+  reviewsCount       Int        @default(0)
+  reviewsLastRefresh DateTime?
 
   @@index([ownerUserId])
   @@index([title])
+  // Serves GET /books?sort=rating: status filters to a contiguous block, and
+  // within it rows are already in (rating desc, id asc) order, so no sort step.
+  // The migration adds NULLS LAST by hand — Prisma's @@index cannot express it,
+  // and without it the query's `nulls: 'last'` cannot use this index at all.
+  @@index([status, reviewsAvgRating(sort: Desc), id])
 }
 
 enum BookStatus {

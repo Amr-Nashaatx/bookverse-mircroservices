@@ -41,6 +41,8 @@ function buildOrderBy(sort: BookSortField, order: Prisma.SortOrder): Prisma.Book
             return [{ publishedAt: { sort: order, nulls: 'last' } }, { id: 'asc' }];
         case 'title':
             return [{ title: order }, { id: 'asc' }];
+        case 'rating':
+            return [{ reviewsAvgRating: { sort: order, nulls: 'last' } }, { id: 'asc' }];
         case 'createdAt':
             return [{ createdAt: order }, { id: 'asc' }];
     }
