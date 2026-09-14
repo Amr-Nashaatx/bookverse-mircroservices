@@ -1,6 +1,6 @@
 import prisma from '../lib/prisma.js';
 import { Prisma } from '../generated/prisma/index.js';
-import { BookSortFields } from '../schemas/book.schemas.js';
+import { BookSortValues } from '../schemas/book.schemas.js';
 
 interface CreateBookWithKeyInput extends Prisma.BookCreateInput {
     idempKey: string;
@@ -8,8 +8,8 @@ interface CreateBookWithKeyInput extends Prisma.BookCreateInput {
 }
 export type BookFilters = { genre?: string[]; q?: string };
 
-type BookSortField = (typeof BookSortFields)[number];
-type PageOptions = { take: number; skip: number; sort: BookSortField; order: Prisma.SortOrder };
+type BookSortValue = (typeof BookSortValues)[number];
+type PageOptions = { take: number; skip: number; sort: BookSortValue };
 
 /*
  * Every sort ends with `id`. Without it, tied titles order differently between
@@ -35,16 +35,23 @@ function buildWhere(filters: BookFilters): Prisma.BookWhereInput {
     };
 }
 
-function buildOrderBy(sort: BookSortField, order: Prisma.SortOrder): Prisma.BookOrderByWithRelationInput[] {
+/*
+ * One ordering per case, fully specified — column, direction and null
+ * placement. `nulls: 'last'` is load-bearing on both nullable columns: an index
+ * stores one order and can only be read forwards or backwards, so DESC NULLS
+ * LAST is a different order from DESC NULLS FIRST and the index that serves one
+ * cannot serve the other. Drop it and the query silently stops using the index
+ * and full-sorts every published row instead. The matching indexes carry NULLS
+ * LAST by hand — Prisma's @@index cannot express it.
+ */
+function buildOrderBy(sort: BookSortValue): Prisma.BookOrderByWithRelationInput[] {
     switch (sort) {
-        case 'publishedAt':
-            return [{ publishedAt: { sort: order, nulls: 'last' } }, { id: 'asc' }];
-        case 'title':
-            return [{ title: order }, { id: 'asc' }];
-        case 'rating':
-            return [{ reviewsAvgRating: { sort: order, nulls: 'last' } }, { id: 'asc' }];
-        case 'createdAt':
-            return [{ createdAt: order }, { id: 'asc' }];
+        case 'newest':
+            return [{ publishedAt: { sort: 'desc', nulls: 'last' } }, { id: 'asc' }];
+        case 'top-rated':
+            return [{ reviewsAvgRating: { sort: 'desc', nulls: 'last' } }, { id: 'asc' }];
+        case 'a-z':
+            return [{ title: 'asc' }, { id: 'asc' }];
     }
 }
 export const bookRepository = {
@@ -70,7 +77,7 @@ export const bookRepository = {
     async findBooks(filters: BookFilters, page: PageOptions) {
         return prisma.book.findMany({
             where: buildWhere(filters),
-            orderBy: buildOrderBy(page.sort, page.order),
+            orderBy: buildOrderBy(page.sort),
             skip: page.skip,
             take: page.take,
         });

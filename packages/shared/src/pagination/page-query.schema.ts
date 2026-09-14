@@ -3,9 +3,16 @@ import { Type } from '@sinclair/typebox';
 /* The half of a list query that is the same in every service. Filters are not
  * here — they belong to whoever owns the columns. */
 export type PageQueryOptions<S extends string> = {
-    /* `sort` names a column, so this allowlist is the defence. Per-endpoint,
-     * hence a factory. */
-    sortFields: readonly S[];
+    /* `sort` names a complete ORDERING, not a column — "newest", "top-rated".
+     * One value fixes the column, the direction and where nulls go, so each one
+     * maps to exactly one index and each one can carry a definition a bare
+     * column name cannot ("top-rated" may mean "and at least N reviews").
+     *
+     * A column allowlist plus a free `order` multiplies out to orderings nobody
+     * wants (worst-rated first) and an index per combination. The allowlist is
+     * still the defence against reaching a column that isn't offered; it is now
+     * also the menu. Per-endpoint, hence a factory. */
+    sortValues: readonly S[];
     defaultSort: S;
     defaultLimit: number;
     /* A 400, not a silent clamp — asking for 100 and getting 20 is
@@ -17,17 +24,15 @@ export type PageQueryOptions<S extends string> = {
 /* Returns properties, not a schema, so a service spreads it into one flat
  * object. Flat matters: ajv's coercion is unreliable across `allOf`. */
 export function pageQueryProps<S extends string>(options: PageQueryOptions<S>) {
-    const { sortFields, defaultSort, defaultLimit, maxLimit } = options;
+    const { sortValues, defaultSort, defaultLimit, maxLimit } = options;
 
     return {
         page: Type.Integer({ minimum: 1, default: 1 }),
         limit: Type.Integer({ minimum: 1, maximum: maxLimit, default: defaultLimit }),
 
         sort: Type.Union(
-            sortFields.map((f) => Type.Literal(f)),
+            sortValues.map((f) => Type.Literal(f)),
             { default: defaultSort },
         ),
-
-        order: Type.Union([Type.Literal('asc'), Type.Literal('desc')], { default: 'desc' }),
     };
 }

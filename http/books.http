@@ -63,7 +63,10 @@ GET {{baseUrl}}/books/{{bookId}}
 
 ### ── BROWSE: filter · sort · paginate ────────────────────────────
 ###
-### Defaults: page=1, limit=10, sort=publishedAt, order=desc.
+### Defaults: page=1, limit=10, sort=newest.
+### sort names a complete ORDERING, not a column: newest | top-rated | a-z.
+### There is no `order` param — each value fixes column, direction and null
+### placement, so each maps to exactly one index.
 ### total is exact up to 500; past that totalIsExact goes false → "50+ pages".
 
 ### Everything (defaults)  →  200
@@ -78,12 +81,16 @@ GET {{baseUrl}}/books?genre=fantasy&genre=engineering
 GET {{baseUrl}}/books?q=distributed
 
 
-### Sort + page
-GET {{baseUrl}}/books?sort=title&order=asc&page=2&limit=5
+### Alphabetical, second page
+GET {{baseUrl}}/books?sort=a-z&page=2&limit=5
+
+
+### Best reviewed
+GET {{baseUrl}}/books?sort=top-rated&limit=5
 
 
 ### Everything at once
-GET {{baseUrl}}/books?genre=engineering&q=systems&sort=title&order=asc&page=1&limit=5
+GET {{baseUrl}}/books?genre=engineering&q=systems&sort=a-z&page=1&limit=5
 
 
 ### ── BROWSE: what must be refused ────────────────────────────────
@@ -92,9 +99,18 @@ GET {{baseUrl}}/books?genre=engineering&q=systems&sort=title&order=asc&page=1&li
 GET {{baseUrl}}/books?limit=51
 
 
-### sort off the allowlist  →  400. sort names a column, so the allowlist is
-### the whole defence.
+### sort off the allowlist  →  400. The allowlist is both the defence and the
+### menu of orderings offered.
 GET {{baseUrl}}/books?sort=ownerUserId
+
+
+### A column name rather than an ordering  →  400. These used to work.
+GET {{baseUrl}}/books?sort=title
+
+
+### `order` is gone, and unknown params are ignored rather than refused  →  200,
+### ordered by the default. Old clients degrade quietly instead of breaking.
+GET {{baseUrl}}/books?sort=newest&order=asc
 
 
 ### page 0  →  400

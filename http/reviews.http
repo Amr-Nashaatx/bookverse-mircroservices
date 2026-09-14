@@ -65,21 +65,28 @@ Content-Type: application/json
 ### ── READS ───────────────────────────────────────────────────────
 
 ### A book's reviews  →  200 (400 without bookId).
-### Same page contract as book-service. Defaults: sort=createdAt, order=desc.
+### Same page contract as book-service, with its own menu of orderings:
+### newest | highest-rated | lowest-rated. Default newest.
+### lowest-rated exists here and not in the catalogue — people go looking for
+### critical reviews; nobody browses worst books first.
 ### No count query — a "load more" button only asks hasMore, so total is a
 ### free lower bound.
 GET {{baseUrl}}/reviews?bookId={{bookId}}
 
 
-### Sorted by rating, second page
-GET {{baseUrl}}/reviews?bookId={{bookId}}&sort=rating&order=desc&page=2&limit=5
+### Best reviews first, second page
+GET {{baseUrl}}/reviews?bookId={{bookId}}&sort=highest-rated&page=2&limit=5
+
+
+### Most critical first
+GET {{baseUrl}}/reviews?bookId={{bookId}}&sort=lowest-rated&limit=5
 
 
 ### limit above the cap  →  400
 GET {{baseUrl}}/reviews?bookId={{bookId}}&limit=51
 
 
-### sort off the allowlist  →  400  (reviews allow createdAt | rating)
+### sort off the allowlist  →  400  (newest | highest-rated | lowest-rated)
 GET {{baseUrl}}/reviews?bookId={{bookId}}&sort=userId
 
 

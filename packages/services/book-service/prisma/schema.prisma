@@ -26,12 +26,19 @@ model Book {
   reviewsLastRefresh DateTime?
 
   @@index([ownerUserId])
-  @@index([title])
-  // Serves GET /books?sort=rating: status filters to a contiguous block, and
-  // within it rows are already in (rating desc, id asc) order, so no sort step.
-  // The migration adds NULLS LAST by hand — Prisma's @@index cannot express it,
-  // and without it the query's `nulls: 'last'` cannot use this index at all.
-  @@index([status, reviewsAvgRating(sort: Desc), id])
+
+  // One index per offered ordering (BookSortValues). Shape is always
+  // (status, <sort column> <direction>, id): status is an equality filter so it
+  // collapses to one contiguous block, and inside that block rows are already
+  // in the exact order the query asks for — no sort step, and drafts are never
+  // fetched.
+  //
+  // The two on nullable columns need NULLS LAST, which Prisma's @@index cannot
+  // express, so their migrations are hand-edited. See those files: without it
+  // the index is unusable for that ordering and Postgres full-sorts instead.
+  @@index([status, publishedAt(sort: Desc), id]) // newest
+  @@index([status, reviewsAvgRating(sort: Desc), id]) // top-rated
+  @@index([status, title, id]) // a-z — non-null, so no NULLS clause needed
 }
 
 enum BookStatus {

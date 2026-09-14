@@ -34,11 +34,11 @@ export const bookService = {
      * it costs no wall-clock time. */
     async listBooks(query: ListBooksQuery): Promise<Page<BookData>> {
         const filters = { genre: query.genre, q: query.q };
-        const pageQuery = { page: query.page, limit: query.limit, sort: query.sort, order: query.order };
+        const pageQuery = { page: query.page, limit: query.limit, sort: query.sort };
 
         const { skip, take } = toSkipTake(pageQuery);
         const [rows, total] = await Promise.all([
-            bookRepository.findBooks(filters, { skip, take, sort: pageQuery.sort, order: pageQuery.order }),
+            bookRepository.findBooks(filters, { skip, take, sort: pageQuery.sort }),
             bookRepository.countBooks(filters, COUNT_CAP),
         ]);
 

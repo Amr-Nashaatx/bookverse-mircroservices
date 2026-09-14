@@ -1,18 +1,21 @@
 import prisma from '../lib/prisma.js';
 import { Prisma } from '../generated/prisma/index.js';
-import { ReviewSortFields } from '../schemas/review.schemas.js';
+import { ReviewSortValues } from '../schemas/review.schemas.js';
 
-type ReviewSortField = (typeof ReviewSortFields)[number];
-export type ReviewPageOptions = { take: number; skip: number; sort: ReviewSortField; order: Prisma.SortOrder };
+type ReviewSortValue = (typeof ReviewSortValues)[number];
+export type ReviewPageOptions = { take: number; skip: number; sort: ReviewSortValue };
 
-/* Every sort ends with `id`: same-millisecond or same-rating reviews would
- * otherwise land on both pages, or neither. Neither field is nullable. */
-function buildOrderBy(sort: ReviewSortField, order: Prisma.SortOrder): Prisma.ReviewOrderByWithRelationInput[] {
+/* One ordering per case, fully specified. Every sort ends with `id`:
+ * same-millisecond or same-rating reviews would otherwise land on both pages,
+ * or neither. Neither column is nullable, so null placement does not arise. */
+function buildOrderBy(sort: ReviewSortValue): Prisma.ReviewOrderByWithRelationInput[] {
     switch (sort) {
-        case 'createdAt':
-            return [{ createdAt: order }, { id: 'asc' }];
-        case 'rating':
-            return [{ rating: order }, { id: 'asc' }];
+        case 'newest':
+            return [{ createdAt: 'desc' }, { id: 'asc' }];
+        case 'highest-rated':
+            return [{ rating: 'desc' }, { id: 'asc' }];
+        case 'lowest-rated':
+            return [{ rating: 'asc' }, { id: 'asc' }];
     }
 }
 
@@ -24,7 +27,7 @@ export const reviewRepository = {
     async findReviewsByBookId(bookId: string, page: ReviewPageOptions) {
         return prisma.review.findMany({
             where: { bookId },
-            orderBy: buildOrderBy(page.sort, page.order),
+            orderBy: buildOrderBy(page.sort),
             skip: page.skip,
             take: page.take,
         });

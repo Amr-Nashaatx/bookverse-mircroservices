@@ -21,14 +21,13 @@ export const reviewService = {
     /* No count query: a "load more" button only asks whether another batch
      * exists, so hasMore is the whole requirement. */
     async listReviewsForBook(query: ListReviewsQuery): Promise<Page<ReviewData>> {
-        const pageQuery = { page: query.page, limit: query.limit, sort: query.sort, order: query.order };
+        const pageQuery = { page: query.page, limit: query.limit, sort: query.sort };
         const { skip, take } = toSkipTake(pageQuery);
 
         const reviews = await reviewRepository.findReviewsByBookId(query.bookId, {
             skip,
             take,
             sort: pageQuery.sort,
-            order: pageQuery.order,
         });
         return toPage(reviews.map(serialize), pageQuery);
     },

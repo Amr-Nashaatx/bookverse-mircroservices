@@ -56,7 +56,7 @@ const GENRES = ['fantasy', 'sci-fi', 'mystery', 'romance', 'history', 'engineeri
 const ADJECTIVES = ['Distributed', 'Silent', 'Broken', 'Last', 'Hidden', 'Crimson', 'Patient', 'Eternal', 'Frozen', 'Restless'];
 const NOUNS = ['Systems', 'Garden', 'Protocol', 'Empire', 'Machine', 'Harvest', 'Cathedral', 'Voyage', 'Archive', 'Tide'];
 
-/* Deliberate collisions, so ?sort=title has real ties to break. */
+/* Deliberate collisions, so ?sort=a-z has real ties for the id tiebreaker. */
 const DUPLICATE_TITLES = ['The Same Title', 'Common Ground', 'Untitled'];
 
 const COMMENTS = [

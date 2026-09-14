@@ -3,8 +3,8 @@ import { Type, type TSchema } from '@sinclair/typebox';
 export type PageQuery<S extends string = string> = {
     page: number;
     limit: number;
+    /* A named ordering, not a column. See pageQueryProps. */
     sort: S;
-    order: 'asc' | 'desc';
 };
 
 export type SkipTake = { skip: number; take: number };

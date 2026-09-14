@@ -51,7 +51,18 @@ export type CreateBookInput = Static<typeof CreateBookSchema>;
 export type UpdateBookInput = Static<typeof UpdateBookSchema>;
 export type BookData = Static<typeof BookSchema>;
 
-export const BookSortFields = ['title', 'publishedAt', 'createdAt', 'rating'] as const;
+/*
+ * The orderings the catalogue offers, as things a reader would recognise rather
+ * than column names. Each maps to exactly one index — see buildOrderBy and
+ * schema.prisma.
+ *
+ * Not offered, deliberately: every ascending twin ("oldest", "worst-rated"),
+ * and `createdAt` — that is when the row was inserted, an internal fact, while
+ * `publishedAt` is what "new" means to a reader. Two fields competing to mean
+ * "recent" is a bug waiting to happen. "z-a" is nearly free if ever wanted: it
+ * is the a-z index read backwards.
+ */
+export const BookSortValues = ['newest', 'top-rated', 'a-z'] as const;
 
 /* Both optional — bare GET /books is the browse page.
  * `genre` repeats: ?genre=a&genre=b. Commas do not split.
@@ -62,7 +73,7 @@ export const bookFilterProps = {
 };
 
 export const ListBooksQuerySchema = Type.Object({
-    ...pageQueryProps({ sortFields: BookSortFields, defaultSort: 'publishedAt', defaultLimit: 10, maxLimit: 50 }),
+    ...pageQueryProps({ sortValues: BookSortValues, defaultSort: 'newest', defaultLimit: 10, maxLimit: 50 }),
     ...bookFilterProps,
 });
 export type ListBooksQuery = Static<typeof ListBooksQuerySchema>;

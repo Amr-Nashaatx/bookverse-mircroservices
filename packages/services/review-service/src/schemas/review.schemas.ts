@@ -6,13 +6,19 @@ export const ReviewParamsSchema = Type.Object({
     id: Type.String({ format: 'uuid' }),
 });
 
-export const ReviewSortFields = ['createdAt', 'rating'] as const;
+/*
+ * A different list from book-service's, and deliberately a different shape:
+ * `lowest-rated` has a real user here, because people go looking for critical
+ * reviews. The catalogue has no equivalent — nobody browses worst books first.
+ * Same contract, different menu, no edit in @bookverse/shared.
+ */
+export const ReviewSortValues = ['newest', 'highest-rated', 'lowest-rated'] as const;
 
 /* `bookId` required — one book's reviews, never all of them. The page half is
  * the same contract book-service answers with. */
 export const ListReviewsQuerySchema = Type.Object({
     bookId: Type.String({ format: 'uuid' }),
-    ...pageQueryProps({ sortFields: ReviewSortFields, defaultSort: 'createdAt', defaultLimit: 10, maxLimit: 50 }),
+    ...pageQueryProps({ sortValues: ReviewSortValues, defaultSort: 'newest', defaultLimit: 10, maxLimit: 50 }),
 });
 export type ListReviewsQuery = Static<typeof ListReviewsQuerySchema>;
 
