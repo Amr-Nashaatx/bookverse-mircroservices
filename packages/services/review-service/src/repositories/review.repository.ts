@@ -24,6 +24,15 @@ export const reviewRepository = {
         return prisma.review.create({ data });
     },
 
+    async findAvgAndCount(bookId: string) {
+        const result = await prisma.review.aggregate({
+            where: { bookId },
+            _avg: { rating: true },
+            _count: { rating: true },
+        });
+
+        return { avgRating: result._avg.rating, count: result._count.rating, bookId };
+    },
     async findReviewsByBookId(bookId: string, page: ReviewPageOptions) {
         return prisma.review.findMany({
             where: { bookId },

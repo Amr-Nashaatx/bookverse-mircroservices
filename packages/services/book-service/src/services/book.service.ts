@@ -18,6 +18,8 @@ function serialize(book: Book): BookData {
         publishedAt: book.publishedAt ? book.publishedAt.toISOString() : null,
         createdAt: book.createdAt.toISOString(),
         updatedAt: book.updatedAt.toISOString(),
+        reviewsAvgRating: book.reviewsAvgRating,
+        reviewsCount: book.reviewsCount,
     };
 }
 
@@ -85,5 +87,24 @@ export const bookService = {
     async updateBook(bookId: string, update: UpdateBookInput) {
         const updated = await bookRepository.updateBook(bookId, update);
         return serialize(updated);
+    },
+
+    /* The rating copy, applied from a review.* event.
+     *
+     * Deliberately narrow, and separate from updateBook: the only caller is the
+     * broker consumer, which sits OUTSIDE makeVerifyGatewaySecret. Widening
+     * updateBook to fit it would not have granted the consumer access — it would
+     * have granted every caller access, including the HTTP path. Two callers with
+     * different authority over the same table get two methods.
+     *
+     * The timestamp is set here rather than passed in, so it is not possible to
+     * refresh the copy without recording when — which is the only thing that
+     * makes the staleness window measurable. */
+    async applyRatingCopy(bookId: string, avgRating: number | null, count: number): Promise<void> {
+        await bookRepository.updateBook(bookId, {
+            reviewsAvgRating: avgRating,
+            reviewsCount: count,
+            reviewsLastRefresh: new Date(),
+        });
     },
 };

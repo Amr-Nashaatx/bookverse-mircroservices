@@ -1,1 +1,1 @@
-export const REVIEWS = 'reviews';
+export const REVIEWS_EXCHANGE = 'reviews';

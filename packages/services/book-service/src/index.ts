@@ -7,7 +7,16 @@ import { TypeBoxTypeProvider } from '@fastify/type-provider-typebox';
 import { bookRoutes } from './routes/book.routes.js';
 
 import { config } from './config/index.js';
-import { globalErrorHandler, makeVerifyGatewaySecret } from '@bookverse/shared';
+import {
+    connectBroker,
+    consumeEvents,
+    disconnectBroker,
+    globalErrorHandler,
+    makeVerifyGatewaySecret,
+    REVIEWS_EXCHANGE,
+} from '@bookverse/shared';
+import { reviewEventsHandler } from './consumers/reviewEventHandler.js';
+import { Queues } from './consumers/index.js';
 
 const fastify = Fastify({ logger: true }).withTypeProvider<TypeBoxTypeProvider>();
 
@@ -15,6 +24,16 @@ const fastify = Fastify({ logger: true }).withTypeProvider<TypeBoxTypeProvider>(
 fastify.register(fastifyHelmet);
 fastify.register(fastifyCors);
 
+// Broker
+await connectBroker(config.rabbitmq.url, async (channel) => {
+    await channel.assertExchange(REVIEWS_EXCHANGE, 'topic', { durable: true });
+    consumeEvents(channel, {
+        exchange: REVIEWS_EXCHANGE,
+        handler: reviewEventsHandler,
+        patterns: ['review.*'],
+        queue: Queues['REVIEWS_QUEUE'],
+    });
+});
 // Health check — outside the secured context so the Docker healthcheck reaches it without the gateway secret.
 fastify.get('/health', async (_request, reply) => {
     return reply.send({ status: 'ok', timestamp: new Date().toISOString() });
@@ -56,6 +75,7 @@ process.on('SIGINT', shutdown);
 
 process.on('unhandledRejection', (reason) => {
     fastify.log.error(reason);
+    disconnectBroker();
     process.exit(1);
 });
 

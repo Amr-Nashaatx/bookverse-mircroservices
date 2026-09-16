@@ -31,6 +31,12 @@ export const BookSchema = Type.Object({
     publishedAt: Type.Union([Type.String({ format: 'date-time' }), Type.Null()]),
     createdAt: Type.String({ format: 'date-time' }),
     updatedAt: Type.String({ format: 'date-time' }),
+    /* The rating copy. book-service owns the column; review-service owns the
+     * fact. `null` is "nobody has reviewed this", which is not `0` — a 0 would
+     * claim every reader hated it, and would sort alongside genuinely bad books.
+     * The reader needs those distinguishable in the body, not by convention. */
+    reviewsAvgRating: Type.Union([Type.Number(), Type.Null()]),
+    reviewsCount: Type.Integer(),
 });
 
 // `data` is Optional to mirror the shared ApiResponse contract (`data?: T`).

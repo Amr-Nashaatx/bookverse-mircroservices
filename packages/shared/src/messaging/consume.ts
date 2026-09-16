@@ -17,7 +17,13 @@ export async function consumeEvents(channel: Channel, config: QueueConfig) {
                 await handler(msg.fields.routingKey, JSON.parse(msg.content.toString()));
                 channel.ack(msg);
             } catch (err) {
-                channel.nack(msg);
+                /* requeue: false — a handler that threw once on this message will throw
+                 * again on the same bytes, so requeueing is an infinite loop. */
+                console.error(
+                    { err, routingKey: msg.fields.routingKey, messageId: msg.properties.messageId },
+                    'handler failed, message dropped',
+                );
+                channel.nack(msg, false, false);
             }
         },
         { noAck: false },

@@ -1,6 +1,7 @@
 node_modules/
 dist/
 learning/
+CLAUDE.md
 .env
 .env.*
 # The template is the one env file that must be committed -- it carries no

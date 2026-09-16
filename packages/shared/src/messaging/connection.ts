@@ -3,12 +3,13 @@ import amqp, { Channel, RecoveringChannelModel } from 'amqplib';
 type SetupFunc = (channel: Channel) => Promise<void>;
 
 let model: RecoveringChannelModel | undefined;
+let channel: Channel | undefined;
 
 export async function connectBroker(url: string, setup: SetupFunc) {
     model = await amqp.connect(url, {
         recovery: {
             setup: async (m: RecoveringChannelModel) => {
-                const channel = await m.createChannel();
+                channel = await m.createChannel();
                 await setup(channel);
             },
         },
@@ -20,6 +21,10 @@ export async function connectBroker(url: string, setup: SetupFunc) {
     return model;
 }
 
+export function getChannel() {
+    if (!channel) throw new Error('broker not connected');
+    return channel;
+}
 export async function disconnectBroker() {
-    model?.close();
+    await model?.close();
 }

@@ -1,13 +1,13 @@
-export const Events = {
-    BOOK_CREATED: 'book.created',
+export * from './exchange.js';
+
+export const ReviewEvents = {
     REVIEW_CREATED: 'review.created',
-    // ... more later
+    REVIEW_UPDATED: 'review.updated',
+    REVIEW_DELETED: 'review.deleted',
 } as const;
 
-export type BookCreatedPayload = {
+export type ReviewsUpdatedPayload = {
     bookId: string;
-    ownerUserId: string;
-    title: string;
+    avgRating: number | null;
+    count: number;
 };
-
-// .. more payloads later

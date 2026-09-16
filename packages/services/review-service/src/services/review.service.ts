@@ -1,4 +1,16 @@
-import { ConflictError, ForbiddenError, NotFoundError, Page, toPage, toSkipTake } from '@bookverse/shared';
+import {
+    ConflictError,
+    ForbiddenError,
+    getChannel,
+    NotFoundError,
+    Page,
+    publishEvent,
+    ReviewEvents,
+    REVIEWS_EXCHANGE,
+    ReviewsUpdatedPayload,
+    toPage,
+    toSkipTake,
+} from '@bookverse/shared';
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/client';
 import type { Review } from '../generated/prisma/index.js';
 import { reviewRepository } from '../repositories/review.repository.js';
@@ -17,6 +29,17 @@ function serialize(review: Review): ReviewData {
     };
 }
 
+type ReviewEvent = keyof typeof ReviewEvents;
+
+async function publishReviewUpdateEvent(bookId: string, event: ReviewEvent) {
+    try {
+        const channel = getChannel();
+        const aggregates = await reviewRepository.findAvgAndCount(bookId);
+        publishEvent(channel, REVIEWS_EXCHANGE, ReviewEvents[event], aggregates);
+    } catch (err) {
+        console.error({ err, bookId, event }, 'rating event not published');
+    }
+}
 export const reviewService = {
     /* No count query: a "load more" button only asks whether another batch
      * exists, so hasMore is the whole requirement. */
@@ -46,6 +69,7 @@ export const reviewService = {
     async createReview(userId: string, input: CreateReviewInput): Promise<ReviewData> {
         try {
             const review = await reviewRepository.createReview({ ...input, userId });
+            await publishReviewUpdateEvent(review.bookId, 'REVIEW_CREATED');
             return serialize(review);
         } catch (e) {
             // The unique (bookId, userId) index is doing double duty here: it
@@ -64,6 +88,7 @@ export const reviewService = {
         if (review.userId !== userId) throw new ForbiddenError('You do not have permission for this action');
 
         const updated = await reviewRepository.updateReview(id, update);
+        await publishReviewUpdateEvent(review.bookId, 'REVIEW_UPDATED');
         return serialize(updated);
     },
 
@@ -73,5 +98,6 @@ export const reviewService = {
         if (review.userId !== userId) throw new ForbiddenError('You do not have permission for this action');
 
         await reviewRepository.deleteReview(id);
+        await publishReviewUpdateEvent(review.bookId, 'REVIEW_DELETED');
     },
 };
