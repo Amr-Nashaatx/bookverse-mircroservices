@@ -1,41 +1,33 @@
 # Retrying reads, never writes
 
-<!--
-Prompts — delete each as you answer it. Prose, not a template.
+## Why and what?
 
-THE PROBLEM
-- A call failed. You don't know whether the callee did the work or not. What
-  makes a read different from a write in that moment?
-- "Idempotent" is the textbook word. What does it actually mean for GET /books
-  versus POST /books, in your own words?
+A call fails and you do not know whether the callee did the work or died on the way back. For a read that does not matter — asking twice for the same book gives the same book, so a wasted retry is all it costs. For a write it matters completely: the request may have created the book and lost the response, and retrying creates a second one.
 
-WHAT YOU CHOSE
-- Reads retry up to 3 times, writes never. Where does the write's retry live
-  instead? (The user's second click, made safe by the Idempotency-Key.)
-- Backoff doubles and is randomised. What happens without the randomness, when
-  every caller that failed at the same moment comes back at the same moment?
-- You honour Retry-After but cap it at 5s. What would an uncapped 10s
-  Retry-After across 3 retries have cost a user on a 1s hop?
+That is the whole difference, and it is why the policy splits by method rather than by error. Reads retry, writes never. The write's retry still exists, it just moved: it is the user's second click, made safe by the `Idempotency-Key` on `POST /books`. That is the one place in the system that can tell a duplicate from a new request.
 
-THE TWO THINGS THAT BIT YOU — both worth writing down
-- The default was 10 retries and nobody chose it. What does a resilience
-  setting that arrived by default rather than by decision tell you about the
-  rest of your config?
-- Your `maxRetriesOn503: 3` type-checked and did nothing for months: the
-  library only reads it from the per-request options. One request was making
-  eleven calls. How would you catch the next config that compiles but is never
-  read? (Note what actually caught this one: counting log lines, not reading
-  code.)
+## The settings
 
-THE INTERACTION WITH THE BREAKER
-- Retries and the circuit breaker now sit on the same path. Does a request that
-  fails three times count as one failure or three?
-- You measured the answer rather than choosing it — the hooks fire once per
-  logical request. Why is one the right answer anyway, from the user's side?
-- A probe is never retried. Why would retrying a probe be actively harmful?
+**3 retries, 503 only, reads only.** `retriesOn503` defaults to 3 per proxy. reply-from refuses non-idempotent methods on its own, so a write never reaches the delay function at all.
 
-THE COST
-- Retries turn one client request into up to four at the callee, at exactly the
-  moment it's least able to cope. What made that trade acceptable here?
-- What would make you turn retries off?
--->
+**Backoff doubles and is fully randomised** — `random() * min(2000, 100 * 2^attempt)`. Without the randomness, every caller that failed at the same instant comes back at the same instant, so a service that was struggling gets a synchronised wave instead of a spread. Capped at 2s.
+
+**`Retry-After` is honoured but capped at 5s.** Uncapped, a callee sending `Retry-After: 10` across three retries parks a caller for thirty seconds on a hop whose budget is one second. One header from one service should not be able to do that.
+
+**Probes are never retried.** A probe is the breaker asking "are you better yet?". Retrying it means the breaker gets an answer averaged over four attempts and several seconds, so it either closes on a service that is still broken or stays open on one that recovered halfway through. It needs one clean yes or no.
+
+## The two things that bit me
+
+**The default was 10 retries and nobody chose it.** reply-from reads `maxRetriesOn503 || 10`, so the number actually in effect was a library author's default rather than my decision. The same `||` means 0 is not expressible — passing 0 buys ten retries — so "never retry" has to be written as `retryDelay: () => null`.
+
+**`maxRetriesOn503: 3` type-checked and did nothing for months.** reply-from only reads it from the per-request options handed to `reply.from()`; set alongside `upstream` in the proxy config it compiles fine and is silently ignored. One request was making eleven calls. What caught it was counting log lines, not reading code — and that is the part worth keeping. A config that compiles but is never read is invisible to every tool I have. It only shows up in behaviour.
+
+## The interaction with the breaker
+
+Retries and the circuit breaker are on the same path, so a request that fails three times could count as three failures or one. I measured it rather than assuming: the hooks fire once per logical request, so it is one.
+
+That is the right answer anyway. The breaker exists to model what a user experienced, and the user experienced one failed request. Counting attempts would let the retry policy inflate the failure rate and trip the breaker on its own retries.
+
+## The cost
+
+Retries turn one client request into up to four at the callee, at exactly the moment it is least able to cope. Acceptable here because they are capped at 3, only fire on a 503 (the callee explicitly saying "not now"), only exist at one layer — the gateway, since no service calls another — and the breaker sits above them to cut the whole thing off when the service is properly down. Take away any one of those four and I would turn retries off.
