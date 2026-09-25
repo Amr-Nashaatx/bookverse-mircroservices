@@ -18,6 +18,8 @@ Content-Type: application/json
   "password": "{{password}}"
 }
 
+###
+
 @accessToken = {{login.response.body.data.tokens.accessToken}}
 
 
@@ -35,6 +37,8 @@ Idempotency-Key: {{$guid}}
   "description": "A field guide to partial failure.",
   "genre": ["non-fiction", "engineering"]
 }
+
+###
 
 @bookId = {{createBook.response.body.data.id}}
 

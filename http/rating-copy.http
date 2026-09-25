@@ -1,0 +1,356 @@
+@baseUrl = http://localhost:3000
+@email = amr@example.com
+@password = password123
+
+### THE RATING COPY  ·  the event path, end to end
+### Not a resource — the ARROW: a write in review-service becoming a column in
+### book-service, via RabbitMQ.
+###
+### No single request proves this works. The cause is here (POST /reviews), the
+### effect is in ANOTHER service database, and it lands asynchronously. Every
+### check below is two requests with a gap, and the gap is the subject.
+###
+### PRE-FLIGHT
+###   docker compose ps
+###   docker exec rabbitmq rabbitmqctl list_queues name messages_ready consumers
+###     expect:  reviews  0  1     <- consumers=0 means NOTHING below works
+###   UI: http://localhost:15672  (guest/guest)
+###
+### USE A SEEDED BOOK FOR THE RANKING CHECKS. A book created here is DRAFT and
+### GET /books serves PUBLISHED only, so it will never appear in ?sort=top-rated.
+
+
+
+### Log in
+# @name login
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{email}}",
+  "password": "{{password}}"
+}
+
+###
+
+@accessToken = {{login.response.body.data.tokens.accessToken}}
+
+
+### ══════════════════════════════════════════════════════════════════
+### PART 1 · Does the arrow exist at all?
+### ══════════════════════════════════════════════════════════════════
+
+### A book to review
+# @name createBook
+POST {{baseUrl}}/books
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+Idempotency-Key: {{$guid}}
+
+{ "title": "The Window", "description": "A book whose rating we will watch move.", "genre": ["non-fiction"] }
+
+###
+
+@bookId = {{createBook.response.body.data.id}}
+
+
+### Baseline  →  reviewsAvgRating: null, reviewsCount: 0
+### null is NOT 0. Nobody has reviewed this; that is different from everyone
+### hating it. Check the body says so structurally.
+# @name bookBefore
+GET {{baseUrl}}/books/{{bookId}}
+
+
+### Post a review. NOTE `data.createdAt` IN THE RESPONSE — that is T0,
+### the moment the review committed in reviews_db.
+# @name createReview
+POST {{baseUrl}}/reviews
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{ "bookId": "{{bookId}}", "rating": 5, "comment": "Held up under partition." }
+
+###
+
+@reviewId = {{createReview.response.body.data.id}}
+
+
+### Read the book back IMMEDIATELY.
+### Send this as fast as you can after the POST. Whether the rating has
+### already moved is itself the measurement — if it has, your window is
+### smaller than your reflexes.
+GET {{baseUrl}}/books/{{bookId}}
+
+
+### Read it again, unhurried  →  reviewsAvgRating: 5, reviewsCount: 1
+### If this one has not moved either, the arrow is broken. Check:
+###   docker exec rabbitmq rabbitmqctl list_queues name messages_ready consumers
+###   docker compose logs book-service --tail 40
+# @name bookAfter
+GET {{baseUrl}}/books/{{bookId}}
+
+### ─── THE WINDOW ───────────────────────────────────────────────────
+### W = bookAfter.reviewsLastRefresh − createReview.createdAt
+###
+### If reviewsLastRefresh is absent from the response, it is not in
+### BookSchema and Fastify stripped it. Either add it there, or read the
+### column directly:
+###
+###   docker exec -it postgres psql -U postgres -d books_db -c \
+###     "select id, \"reviewsAvgRating\", \"reviewsCount\", \"reviewsLastRefresh\" \
+###      from \"Book\" where id = '<bookId>';"
+###
+### DO NOT use now() − reviewsLastRefresh. That is the AGE OF THE COPY, which
+### grows on a correct row that nobody has reviewed lately. You need both ends.
+
+
+### ══════════════════════════════════════════════════════════════════
+### PART 2 · Does it track every kind of change?
+### ══════════════════════════════════════════════════════════════════
+
+### Update the rating 5 → 2. Book should follow.
+PATCH {{baseUrl}}/reviews/{{reviewId}}
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{ "rating": 2 }
+
+
+### →  reviewsAvgRating: 2, reviewsCount: 1
+GET {{baseUrl}}/books/{{bookId}}
+
+
+### Delete the only review. This is the interesting one:
+### the aggregate now runs over ZERO rows. COUNT gives 0, AVG gives null.
+DELETE {{baseUrl}}/reviews/{{reviewId}}
+Authorization: Bearer {{accessToken}}
+
+
+### →  reviewsAvgRating: null, reviewsCount: 0  — back to the baseline.
+### Not 0 and 0. If count comes back as something other than 0, the publisher
+### is sending _sum where it means _count.
+GET {{baseUrl}}/books/{{bookId}}
+
+
+### ══════════════════════════════════════════════════════════════════
+### PART 3 · The ranked page  (use a SEEDED book — see header)
+### ══════════════════════════════════════════════════════════════════
+
+### The catalogue, best first. Unrated books sort last (NULLS LAST).
+GET {{baseUrl}}/books?sort=top-rated&limit=10
+
+
+### Page 2 of the same ordering — the ranking must be stable across pages.
+GET {{baseUrl}}/books?sort=top-rated&page=2&limit=10
+
+
+### Now review a seeded book highly, then re-run the first query and watch it
+### climb. Paste a published book's id here:
+@seededBookId = PASTE_A_PUBLISHED_BOOK_ID
+
+POST {{baseUrl}}/reviews
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{ "bookId": "{{seededBookId}}", "rating": 5, "comment": "Moves the ranking." }
+
+
+### →  the book above should now be at or near the top, with nobody
+###    having run a script.
+GET {{baseUrl}}/books?sort=top-rated&limit=10
+
+
+### ══════════════════════════════════════════════════════════════════
+### PART 4 · The proof that the buffer bought something
+### ══════════════════════════════════════════════════════════════════
+###
+### THIS IS THE ONE THAT MATTERS. It is the whole point of Lesson 08 and you
+### have not seen it yet. Half of it is shell, half is here.
+###
+###   1.  docker compose stop book-service
+###   2.  Send the three POSTs below. ALL THREE MUST RETURN 201.
+###       Before the broker, this would have been three 503s — review-service
+###       would have been down because book-service was down.
+###   3.  Watch them pile up, unconsumed:
+###         docker exec rabbitmq rabbitmqctl list_queues name messages_ready consumers
+###       Expect: reviews  3  0     ← three ready, ZERO consumers
+###       This is rho = infinity on the curve. Note the window is now
+###       unbounded and NOTHING has reported an error anywhere.
+###   4.  docker compose start book-service
+###   5.  Re-run the queue command until messages_ready is 0, then GET the
+###       books below. All three ratings landed, unattended.
+###
+### AND WHILE IT DRAINS, capture mu: read the ack rate on the queue page in
+### the management UI DURING the drain. That number is your consumer's
+### capacity, and it is the only moment you can see it — in a system that is
+### keeping up, the ack rate is just your arrival rate wearing a disguise.
+
+### Three books to review while the consumer is down
+# @name bookA
+POST {{baseUrl}}/books
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+Idempotency-Key: {{$guid}}
+
+{ "title": "Buffered A", "description": "Reviewed while the consumer was down.", "genre": ["test"] }
+
+###
+
+@bookAId = {{bookA.response.body.data.id}}
+
+###
+# @name bookB
+POST {{baseUrl}}/books
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+Idempotency-Key: {{$guid}}
+
+{ "title": "Buffered B", "description": "Reviewed while the consumer was down.", "genre": ["test"] }
+
+###
+
+@bookBId = {{bookB.response.body.data.id}}
+
+###
+# @name bookC
+POST {{baseUrl}}/books
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+Idempotency-Key: {{$guid}}
+
+{ "title": "Buffered C", "description": "Reviewed while the consumer was down.", "genre": ["test"] }
+
+###
+
+@bookCId = {{bookC.response.body.data.id}}
+
+
+### ↓↓↓  NOW STOP BOOK-SERVICE, THEN SEND THESE THREE  ↓↓↓
+### Each must return 201 with book-service down.
+
+POST {{baseUrl}}/reviews
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{ "bookId": "{{bookAId}}", "rating": 5, "comment": "Posted into the void." }
+
+###
+POST {{baseUrl}}/reviews
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{ "bookId": "{{bookBId}}", "rating": 4, "comment": "Posted into the void." }
+
+###
+POST {{baseUrl}}/reviews
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{ "bookId": "{{bookCId}}", "rating": 3, "comment": "Posted into the void." }
+
+
+### ↓↓↓  NOW START BOOK-SERVICE, WAIT FOR THE QUEUE TO DRAIN  ↓↓↓
+### All three must have landed.
+
+GET {{baseUrl}}/books/{{bookAId}}
+###
+GET {{baseUrl}}/books/{{bookBId}}
+###
+GET {{baseUrl}}/books/{{bookCId}}
+
+
+### ══════════════════════════════════════════════════════════════════
+### PART 5 · What happens when the BROKER is down
+### ══════════════════════════════════════════════════════════════════
+###
+### Your decision 3 was: accept the write and log, repair via backfill.
+### This is where you find out whether the code agrees with you.
+###
+###   1.  docker compose stop rabbitmq
+###   2.  Send the POST below.
+###
+### WHAT SHOULD HAPPEN:  201. The review is saved. The rating is stale, and a
+###                      line in the log says the event was not published.
+### WHAT MUST NOT HAPPEN: a 500, or review-service exiting. An unawaited
+###                      publish with no catch reaches unhandledRejection and
+###                      takes the service down — which answers decision 3 as
+###                      "take the whole service out", worse than any of the
+###                      three options you were choosing between.
+###
+###   3.  docker compose logs review-service --tail 30
+###   4.  docker compose start rabbitmq
+###   5.  Repair:  npm run backfill:ratings   (or node scripts/backfill-ratings.js)
+###       Then re-read the book. THE BACKFILL IS YOUR REPAIR PATH, not a
+###       one-off migration. This is the step that proves it.
+
+POST {{baseUrl}}/reviews
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{ "bookId": "{{bookId}}", "rating": 4, "comment": "Written while the broker was down." }
+
+###
+GET {{baseUrl}}/books/{{bookId}}
+
+
+### ══════════════════════════════════════════════════════════════════
+### PART 6 · The poison message  (this is Build 2's fixture)
+### ══════════════════════════════════════════════════════════════════
+###
+### A review can outlive its book. The two tables are in different databases,
+### so no foreign key can catch it. This is a REAL bug, not an injected one.
+###
+### Today it is silently discarded. After Build 2 it lands in reviews.dlq with
+### x-first-death-reason telling you why.
+
+### 1. A book, and a review of it
+# @name doomedBook
+POST {{baseUrl}}/books
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+Idempotency-Key: {{$guid}}
+
+{ "title": "About To Be Deleted", "description": "Its review will outlive it.", "genre": ["test"] }
+
+###
+
+@doomedBookId = {{doomedBook.response.body.data.id}}
+
+###
+# @name doomedReview
+POST {{baseUrl}}/reviews
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{ "bookId": "{{doomedBookId}}", "rating": 5, "comment": "Reviewing a doomed book." }
+
+###
+
+@doomedReviewId = {{doomedReview.response.body.data.id}}
+
+
+### 2. Delete the BOOK. review-service has never heard of this.
+DELETE {{baseUrl}}/books/{{doomedBookId}}
+Authorization: Bearer {{accessToken}}
+
+
+### 3. Touch the review. review-service publishes happily; book-service tries
+###    to update a row that is not there  →  Prisma P2025.
+PATCH {{baseUrl}}/reviews/{{doomedReviewId}}
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{ "rating": 1 }
+
+
+### 4. Now go look.
+###    TODAY:        docker compose logs book-service --tail 30
+###                  → the error is in a log nobody reads, message discarded.
+###    AFTER BUILD 2: the message is in reviews.dlq. Management UI →
+###                  Queues → reviews.dlq → Get messages → read
+###                  x-first-death-reason and x-death.
+###
+###    AND CHECK THE QUEUE DID NOT BLOCK:
+###      docker exec rabbitmq rabbitmqctl list_queues name messages_ready
+###    A normal review should still update its rating promptly. If messages_ready
+###    is climbing and nothing moves, you have a hot loop, not a dead letter.

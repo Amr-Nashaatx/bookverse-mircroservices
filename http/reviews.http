@@ -18,6 +18,8 @@ Content-Type: application/json
   "password": "{{password}}"
 }
 
+###
+
 @accessToken = {{login.response.body.data.tokens.accessToken}}
 
 
@@ -29,6 +31,8 @@ Content-Type: application/json
 Idempotency-Key: {{$guid}}
 
 { "title": "The Seam", "description": "A book that exists, so we can review it.", "genre": ["non-fiction"] }
+
+###
 
 @bookId = {{createBook.response.body.data.id}}
 
@@ -42,6 +46,8 @@ Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 { "bookId": "{{bookId}}", "rating": 5, "comment": "Held up under partition." }
+
+###
 
 @reviewId = {{createReview.response.body.data.id}}
 

@@ -14,9 +14,9 @@ import {
     globalErrorHandler,
     makeVerifyGatewaySecret,
     REVIEWS_EXCHANGE,
+    REVIEWS_DLX,
 } from '@bookverse/shared';
-import { reviewEventsHandler } from './consumers/reviewEventHandler.js';
-import { Queues } from './consumers/index.js';
+import { ReviewsDlq, ReviewsQueue } from './config/queues.js';
 
 const fastify = Fastify({ logger: true }).withTypeProvider<TypeBoxTypeProvider>();
 
@@ -27,12 +27,11 @@ fastify.register(fastifyCors);
 // Broker
 await connectBroker(config.rabbitmq.url, async (channel) => {
     await channel.assertExchange(REVIEWS_EXCHANGE, 'topic', { durable: true });
-    consumeEvents(channel, {
-        exchange: REVIEWS_EXCHANGE,
-        handler: reviewEventsHandler,
-        patterns: ['review.*'],
-        queue: Queues['REVIEWS_QUEUE'],
-    });
+    await channel.assertExchange(REVIEWS_DLX, 'topic', { durable: true });
+
+    // DLQ first: a rejection before its binding exists would be unroutable and lost.
+    await consumeEvents(channel, ReviewsDlq);
+    await consumeEvents(channel, ReviewsQueue);
 });
 // Health check — outside the secured context so the Docker healthcheck reaches it without the gateway secret.
 fastify.get('/health', async (_request, reply) => {

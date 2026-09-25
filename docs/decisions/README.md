@@ -22,6 +22,7 @@ renamed and reinvented, problems don't.
 ## [Consistency](consistency/) — a fact has to exist on both sides of a boundary, and cannot be current on both
 
 - [The rating copy](consistency/rating-copy.md) — book-service holds a number review-service owns, how stale it may be, and who moves it
+- [When a review event can't be applied](consistency/failed-events.md) — retry what might recover, park the rest where it can be read
 
 ## [Overload](overload/) — more work arrives than can be done, and the queue does the damage
 

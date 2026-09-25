@@ -35,3 +35,5 @@ Four ways to keep it true. book-service asks review-service on every read, which
 - An ordering guard, so an old message cannot overwrite a newer one.
 - A transactional outbox — the only thing that actually closes the gap between the commit and the publish.
 - One 5-star review currently outranks 500 reviews averaging 4.8. `reviewsCount` exists to fix that and nothing uses it yet.
+
+**Later:** dead-lettering and bounded retry are in, see [When a review event can't be applied](failed-events.md). Transient failures are no longer dropped.
