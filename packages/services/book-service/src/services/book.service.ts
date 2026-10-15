@@ -1,6 +1,17 @@
-import { ConflictError, NotFoundError, Page, toPage, toSkipTake } from '@bookverse/shared';
+import {
+    BookEvents,
+    BOOKS_EXCHANGE,
+    ConflictError,
+    getChannel,
+    NotFoundError,
+    Page,
+    publishEvent,
+    ReviewsUpdatedPayload,
+    toPage,
+    toSkipTake,
+} from '@bookverse/shared';
 import { bookRepository } from '../repositories/book.repository.js';
-import type { Book } from '../generated/prisma/index.js';
+import type { Book, BookStatus } from '../generated/prisma/index.js';
 import type { BookData, CreateBookInput, ListBooksQuery, UpdateBookInput } from '../schemas/book.schemas.js';
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/client';
 import { keyRepository } from '../repositories/key.repository.js';
@@ -31,6 +42,7 @@ type CreateBookOutcome = {
     replayed: boolean;
     book: BookData;
 };
+type Diff<T, U> = T extends U ? never : T;
 export const bookService = {
     /* Capped, so the count's cost does not grow with the table; parallel, so
      * it costs no wall-clock time. */
@@ -85,26 +97,37 @@ export const bookService = {
     },
 
     async updateBook(bookId: string, update: UpdateBookInput) {
-        const updated = await bookRepository.updateBook(bookId, update);
+        const status = update.status ? (update.status.toUpperCase() as BookStatus) : undefined;
+        const updated = await bookRepository.updateBook(bookId, { ...update, status });
+        if (status) {
+            // Same policy as review-service: the update has committed, so a broker outage
+            // is logged, not turned into a 500. The backfill repairs a missed event.
+            try {
+                publishEvent(getChannel(), BOOKS_EXCHANGE, BookEvents['STATUS_UPDATED'], {
+                    status,
+                    bookId,
+                    version: updated.version,
+                });
+            } catch (err) {
+                console.error({ err, bookId, status }, 'status event not published');
+            }
+        }
         return serialize(updated);
     },
 
     /* The rating copy, applied from a review.* event.
      *
      * Deliberately narrow, and separate from updateBook: the only caller is the
-     * broker consumer, which sits OUTSIDE makeVerifyGatewaySecret. Widening
-     * updateBook to fit it would not have granted the consumer access — it would
-     * have granted every caller access, including the HTTP path. Two callers with
-     * different authority over the same table get two methods.
-     *
-     * The timestamp is set here rather than passed in, so it is not possible to
-     * refresh the copy without recording when — which is the only thing that
-     * makes the staleness window measurable. */
-    async applyRatingCopy(bookId: string, avgRating: number | null, count: number): Promise<void> {
-        await bookRepository.updateBook(bookId, {
-            reviewsAvgRating: avgRating,
-            reviewsCount: count,
+     * broker consumer, which sits OUTSIDE makeVerifyGatewaySecret.  */
+
+    async applyRatingCopyIfNewer(event: ReviewsUpdatedPayload): Promise<void> {
+        const applied = await bookRepository.applyRatingCopy(event.bookId, {
+            reviewsAvgRating: event.avgRating,
+            reviewsCount: event.count,
             reviewsLastRefresh: new Date(),
+            reviewsVersion: event.version,
         });
+
+        if (applied === 0) console.log(`Failed to apply review for book ${event.bookId}`);
     },
 };

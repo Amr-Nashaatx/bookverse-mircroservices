@@ -15,6 +15,7 @@ import {
     makeVerifyGatewaySecret,
     REVIEWS_EXCHANGE,
     REVIEWS_DLX,
+    BOOKS_EXCHANGE,
 } from '@bookverse/shared';
 import { ReviewsDlq, ReviewsQueue } from './config/queues.js';
 
@@ -28,8 +29,9 @@ fastify.register(fastifyCors);
 await connectBroker(config.rabbitmq.url, async (channel) => {
     await channel.assertExchange(REVIEWS_EXCHANGE, 'topic', { durable: true });
     await channel.assertExchange(REVIEWS_DLX, 'topic', { durable: true });
-
+    await channel.assertExchange(BOOKS_EXCHANGE, 'topic', { durable: true });
     // DLQ first: a rejection before its binding exists would be unroutable and lost.
+    // Reviews DLQ has no consumers, which is specified in its config.
     await consumeEvents(channel, ReviewsDlq);
     await consumeEvents(channel, ReviewsQueue);
 });

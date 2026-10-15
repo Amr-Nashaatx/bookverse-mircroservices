@@ -102,7 +102,24 @@ export const bookRepository = {
     },
 
     async updateBook(id: string, update: Prisma.BookUpdateInput) {
-        return prisma.book.update({ where: { id }, data: update });
+        return prisma.book.update({ where: { id }, data: { ...update, version: { increment: 1 } } });
+    },
+
+    async applyRatingCopy(id: string, update: Prisma.BookUpdateInput) {
+        const reviewsVersion = update.reviewsVersion as number;
+
+        const { count: applied } = await prisma.book.updateMany({
+            where: { id, OR: [{ reviewsVersion: null }, { reviewsVersion: { lt: reviewsVersion } }] },
+            data: {
+                reviewsAvgRating: update.reviewsAvgRating,
+                reviewsVersion: update.reviewsVersion,
+                reviewsCount: update.reviewsCount,
+                reviewsLastRefresh: new Date(),
+                version: { increment: 1 },
+            },
+        });
+
+        return applied;
     },
 
     async deleteBook(id: string) {

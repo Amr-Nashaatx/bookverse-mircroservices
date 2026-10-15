@@ -1,6 +1,7 @@
 import prisma from '../lib/prisma.js';
 import { Prisma } from '../generated/prisma/index.js';
 import { ReviewSortValues } from '../schemas/review.schemas.js';
+import { BookStatusChangePayload } from '@bookverse/shared';
 
 type ReviewSortValue = (typeof ReviewSortValues)[number];
 export type ReviewPageOptions = { take: number; skip: number; sort: ReviewSortValue };
@@ -24,14 +25,26 @@ export const reviewRepository = {
         return prisma.review.create({ data });
     },
 
+    async getBookStatus(bookId: string) {
+        return prisma.bookStatus.findUnique({ where: { bookId } });
+    },
     async findAvgAndCount(bookId: string) {
-        const result = await prisma.review.aggregate({
-            where: { bookId },
-            _avg: { rating: true },
-            _count: { rating: true },
+        const { aggregates, version } = await prisma.$transaction(async (tx) => {
+            const [{ version }] = await tx.$queryRaw<{ version: number }[]>`
+                INSERT INTO "BookReviewVersion" VALUES (${bookId}, 1) ON CONFLICT ("bookId")
+                DO UPDATE SET version = "BookReviewVersion".version + 1
+                RETURNING version
+            `;
+            const result = await tx.review.aggregate({
+                where: { bookId },
+                _avg: { rating: true },
+                _count: { rating: true },
+            });
+
+            return { aggregates: result, version };
         });
 
-        return { avgRating: result._avg.rating, count: result._count.rating, bookId };
+        return { avgRating: aggregates._avg.rating, count: aggregates._count.rating, bookId, version };
     },
     async findReviewsByBookId(bookId: string, page: ReviewPageOptions) {
         return prisma.review.findMany({
@@ -52,5 +65,12 @@ export const reviewRepository = {
 
     async deleteReview(id: string) {
         return prisma.review.delete({ where: { id } });
+    },
+
+    async applyStatusChange(payload: BookStatusChangePayload) {
+        await prisma.$executeRaw`
+            INSERT INTO "BookStatus" ("bookId", status, version) VALUES (${payload.bookId}, ${payload.status}, ${payload.version})
+            ON CONFLICT ("bookId") DO UPDATE SET status = EXCLUDED.status, version = EXCLUDED.version
+            WHERE "BookStatus".version < EXCLUDED.version`;
     },
 };

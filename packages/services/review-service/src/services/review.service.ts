@@ -1,4 +1,5 @@
 import {
+    BookStatusChangePayload,
     ConflictError,
     ForbiddenError,
     getChannel,
@@ -7,7 +8,6 @@ import {
     publishEvent,
     ReviewEvents,
     REVIEWS_EXCHANGE,
-    ReviewsUpdatedPayload,
     toPage,
     toSkipTake,
 } from '@bookverse/shared';
@@ -68,6 +68,11 @@ export const reviewService = {
      */
     async createReview(userId: string, input: CreateReviewInput): Promise<ReviewData> {
         try {
+            const bookStatus = await reviewRepository.getBookStatus(input.bookId);
+            // Allowlist: the copy holds the DB enum (uppercase), and any status added later is refused by default.
+            if (!bookStatus || bookStatus.status !== 'PUBLISHED') {
+                throw new ForbiddenError('Book is not published to review');
+            }
             const review = await reviewRepository.createReview({ ...input, userId });
             await publishReviewUpdateEvent(review.bookId, 'REVIEW_CREATED');
             return serialize(review);
@@ -99,5 +104,9 @@ export const reviewService = {
 
         await reviewRepository.deleteReview(id);
         await publishReviewUpdateEvent(review.bookId, 'REVIEW_DELETED');
+    },
+
+    async applyStatusChange(payload: BookStatusChangePayload) {
+        await reviewRepository.applyStatusChange(payload);
     },
 };

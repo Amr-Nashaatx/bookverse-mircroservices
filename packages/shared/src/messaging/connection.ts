@@ -1,4 +1,4 @@
-import amqp, { Channel, RecoveringChannelModel } from 'amqplib';
+import amqp, { Channel, RecoveringChannelModel, ChannelModel } from 'amqplib';
 
 type SetupFunc = (channel: Channel) => Promise<void>;
 
@@ -8,7 +8,7 @@ let channel: Channel | undefined;
 export async function connectBroker(url: string, setup: SetupFunc) {
     model = await amqp.connect(url, {
         recovery: {
-            setup: async (m: RecoveringChannelModel) => {
+            setup: async (m: ChannelModel) => {
                 channel = await m.createChannel();
                 await setup(channel);
             },

@@ -6,16 +6,29 @@ import { TypeBoxTypeProvider } from '@fastify/type-provider-typebox';
 // routes
 import { reviewRoutes } from './routes/review.routes.js';
 
-import { connectBroker, publishEvent, disconnectBroker, REVIEWS_EXCHANGE } from '@bookverse/shared';
+import {
+    connectBroker,
+    disconnectBroker,
+    REVIEWS_EXCHANGE,
+    BOOKS_EXCHANGE,
+    BOOKS_DLX,
+    consumeEvents,
+} from '@bookverse/shared';
 
 import { config } from './config/index.js';
 import { globalErrorHandler, makeVerifyGatewaySecret } from '@bookverse/shared';
+import { BooksDlq, BooksQeueue } from './config/queues.js';
 
 const fastify = Fastify({ logger: true }).withTypeProvider<TypeBoxTypeProvider>();
 
 // Broker
 connectBroker(config.rabbitmq.url, async (channel) => {
     await channel.assertExchange(REVIEWS_EXCHANGE, 'topic', { durable: true });
+    await channel.assertExchange(BOOKS_EXCHANGE, 'topic', { durable: true });
+    await channel.assertExchange(BOOKS_DLX, 'topic', { durable: true });
+
+    await consumeEvents(channel, BooksDlq);
+    await consumeEvents(channel, BooksQeueue);
 });
 
 // Plugins

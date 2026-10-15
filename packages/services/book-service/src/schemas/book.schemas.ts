@@ -17,6 +17,9 @@ export const UpdateBookSchema = Type.Object({
     title: Type.Optional(Type.String({ minLength: 1 })),
     description: Type.Optional(Type.String({ minLength: 1 })),
     genre: Type.Optional(Type.Array(Type.String(), { default: [] })),
+    // Lowercase on the wire; the service maps it to the DB enum. Not a TypeBox Transform:
+    // Fastify's default validator never runs Decode, so the handler would get it unchanged.
+    status: Type.Optional(Type.Union([Type.Literal('published'), Type.Literal('archived'), Type.Literal('draft')])),
     coverImageUrl: Type.Optional(Type.Optional(Type.String({ format: 'uri' }))),
 });
 // Response Schemas

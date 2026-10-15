@@ -20,3 +20,14 @@ model Review {
 
   @@unique([bookId, userId])
 }
+
+model BookReviewVersion {
+  bookId  String @id @default(uuid())
+  version Int
+}
+
+model BookStatus {
+  bookId  String @id
+  status  String
+  version Int
+}

@@ -8,25 +8,27 @@ datasource db {
 }
 
 model Book {
-  id                 String     @id @default(uuid())
-  title              String
+  id            String     @id @default(uuid())
+  title         String
   // The user who created the book. Ownership checks compare this to request.user.id.
   // Named for the User it points at, not for the "author" role: an Author is a
   // separate thing (pen name, approval status) that this service does not know about.
-  ownerUserId        String
-  genre              String[]
-  description        String
-  coverImageUrl      String?
-  status             BookStatus @default(DRAFT)
-  publishedAt        DateTime?
-  createdAt          DateTime   @default(now())
-  updatedAt          DateTime   @updatedAt
+  ownerUserId   String
+  genre         String[]
+  description   String
+  coverImageUrl String?
+  status        BookStatus @default(DRAFT)
+  publishedAt   DateTime?
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+  version       Int        @default(0)
+
   reviewsAvgRating   Float?
-  reviewsCount       Int        @default(0)
+  reviewsCount       Int       @default(0)
   reviewsLastRefresh DateTime?
+  reviewsVersion     Int?
 
   @@index([ownerUserId])
-
   // One index per offered ordering (BookSortValues). Shape is always
   // (status, <sort column> <direction>, id): status is an equality filter so it
   // collapses to one contiguous block, and inside that block rows are already
