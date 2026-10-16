@@ -48,3 +48,15 @@ services:
             NODE_ENV: development
         ports:
             - '9232:9232'
+    notification-service:
+        env_file:
+            - .env.dev
+        working_dir: /app
+        volumes:
+            - ./packages/services/notification-service/src:/app/packages/services/notification-service/src
+            - ./packages/shared/src:/app/packages/shared/src
+        command: ['npm', 'run', 'dev:container:notification']
+        environment:
+            NODE_ENV: development
+        ports:
+            - '9233:9233'

@@ -11,6 +11,10 @@ export type ServiceEdgeSpec = {
     upstream: string;
     prefix: string;
     forwardsIdentity?: boolean;
+    /** Which requests must carry a verified user. 'writes' (default): reads are
+     *  public, as for the catalogue and reviews. 'all': the edge has no public
+     *  route, so a GET without a valid token is a 401 here. */
+    identityOn?: 'writes' | 'all';
     /** Required: a measured per-edge value, so a new edge cannot silently
      *  inherit someone else's hop budget. */
     timeoutMs: number;
@@ -75,7 +79,7 @@ export class ServiceProxy {
         this.proxy.replyOptions = { timeout: this.spec.timeoutMs };
         if (this.spec.forwardsIdentity) {
             this.addPreHandlerLogic(async (request, reply) => {
-                if (request.method !== 'GET') await verifyJwt(request, reply);
+                if (this.spec.identityOn === 'all' || request.method !== 'GET') await verifyJwt(request, reply);
             });
         }
     }

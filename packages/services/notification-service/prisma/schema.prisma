@@ -1,0 +1,29 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Notification {
+  id String @id @default(uuid())
+
+  // The recipient: the owner of the reviewed book.
+  userId String
+
+  // Identity of the event that produced this row. Not unique yet: which
+  // column refuses a redelivered event is still undecided.
+  eventId  String
+  reviewId String
+
+  bookId String
+  // Snapshot at the time of the notification; a later rename does not rewrite it.
+  bookTitle String
+  rating    Int
+
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt(sort: Desc), id])
+}

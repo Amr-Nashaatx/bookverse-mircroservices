@@ -127,6 +127,31 @@ services:
             retries: 5
         networks:
             - bookverse
+    notification-service:
+        build:
+            context: .
+            dockerfile: packages/services/notification-service/Dockerfile
+        restart: always
+        container_name: notification-service
+        env_file:
+            - ./.env.dev
+        environment:
+            NODE_ENV: ${NODE_ENV:-development}
+            PORT: 3004
+        depends_on:
+            postgres:
+                condition: service_healthy
+            rabbitmq:
+                condition: service_healthy
+            redis:
+                condition: service_healthy
+        healthcheck:
+            test: ['CMD', 'wget', '--quiet', '--tries=1', '--spider', 'http://127.0.0.1:3004/health']
+            interval: 10s
+            timeout: 5s
+            retries: 5
+        networks:
+            - bookverse
     gateway:
         build:
             context: .
@@ -141,6 +166,7 @@ services:
             AUTH_SERVICE_URL: http://auth-service:3001/auth
             BOOK_SERVICE_URL: http://book-service:3002/books
             REVIEW_SERVICE_URL: http://review-service:3003/reviews
+            NOTIFICATION_SERVICE_URL: http://notification-service:3004/notifications
         ports:
             - '3000:3000'
         depends_on:

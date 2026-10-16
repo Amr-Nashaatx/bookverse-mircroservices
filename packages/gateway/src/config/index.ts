@@ -21,5 +21,6 @@ export const config = {
         auth: process.env.AUTH_SERVICE_URL || 'http://localhost:3001/auth',
         book: process.env.BOOK_SERVICE_URL || 'http://localhost:3002/books',
         review: process.env.REVIEW_SERVICE_URL || 'http://localhost:3003/reviews',
+        notification: process.env.NOTIFICATION_SERVICE_URL || 'http://localhost:3004/notifications',
     },
 };

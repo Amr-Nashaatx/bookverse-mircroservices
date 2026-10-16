@@ -28,3 +28,14 @@ export const reviewProxySpec: ServiceEdgeSpec = {
     timeoutMs: 1_000,
     forwardsIdentity: true,
 };
+
+export const notificationProxySpec: ServiceEdgeSpec = {
+    prefix: '/notifications',
+    upstream: config.services.notification,
+    connections: 8,
+    // Copied from review as a starting point; one indexed read per request. Unmeasured.
+    timeoutMs: 1_000,
+    forwardsIdentity: true,
+    // The first edge whose reads are private: every notification belongs to someone.
+    identityOn: 'all',
+};

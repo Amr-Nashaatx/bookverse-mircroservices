@@ -20,7 +20,7 @@
  * counter that resets to req-1 on every restart, and nodemon restarts often.
  * Joining on reqId alone silently merges unrelated requests.
  *
- * Usage: node scripts/latency.mjs <gateway|auth|book|review> [options]
+ * Usage: node scripts/latency.mjs <gateway|auth|book|review|notification> [options]
  *   --all              include /health (excluded by default — it dwarfs everything)
  *   --route <substr>   only routes containing this substring
  *   --tail <n>         log lines to scan (default 20000)
@@ -29,7 +29,7 @@
 import { spawn } from 'node:child_process';
 import { createInterface } from 'node:readline';
 
-const CONTAINERS = { gateway: 'gateway', auth: 'auth-service', book: 'book-service', review: 'review-service' };
+const CONTAINERS = { gateway: 'gateway', auth: 'auth-service', book: 'book-service', review: 'review-service', notification: 'notification-service' };
 
 const argv = process.argv.slice(2);
 const container = CONTAINERS[argv[0]];

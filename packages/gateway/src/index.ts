@@ -9,8 +9,9 @@ import { config } from './config/index.js';
 import { authServiceBreaker } from './breakers/auth-breaker.js';
 import { bookServiceBreaker } from './breakers/book-breaker.js';
 import { reviewServiceBreaker } from './breakers/review-breaker.js';
+import { notificationServiceBreaker } from './breakers/notification-breaker.js';
 import { ServiceProxy } from './proxies/ServiceProxy.js';
-import { authProxySepc, bookProxySepc, reviewProxySpec } from './config/proxySpecs.js';
+import { authProxySepc, bookProxySepc, notificationProxySpec, reviewProxySpec } from './config/proxySpecs.js';
 import { bookPageRoutes } from './routes/bookPage.js';
 
 // Third-party plugins
@@ -34,7 +35,7 @@ declare module 'fastify' {
 }
 
 // The breakers announce their state changes; here is where they become logs.
-for (const breaker of [authServiceBreaker, bookServiceBreaker, reviewServiceBreaker]) {
+for (const breaker of [authServiceBreaker, bookServiceBreaker, reviewServiceBreaker, notificationServiceBreaker]) {
     breaker.onTransition((transition) => fastify.log.warn(transition, 'circuit breaker'));
 }
 
@@ -51,6 +52,7 @@ new ServiceProxy(fastify, authProxySepc).buildAndRegisterProxy(authServiceBreake
 fastify.register(async (fastify) => {
     new ServiceProxy(fastify, bookProxySepc).buildAndRegisterProxy(bookServiceBreaker);
     new ServiceProxy(fastify, reviewProxySpec).buildAndRegisterProxy(reviewServiceBreaker);
+    new ServiceProxy(fastify, notificationProxySpec).buildAndRegisterProxy(notificationServiceBreaker);
 });
 
 // Health check
