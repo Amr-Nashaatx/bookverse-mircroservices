@@ -14,4 +14,8 @@ export const notificationRepository = {
             take: page.take,
         });
     },
+
+    async create(data: any) {
+        return prisma.notification.create({ data });
+    },
 };

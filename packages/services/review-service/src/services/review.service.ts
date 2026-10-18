@@ -31,7 +31,7 @@ function serialize(review: Review): ReviewData {
 
 type ReviewEvent = keyof typeof ReviewEvents;
 
-async function publishReviewUpdateEvent(bookId: string, event: ReviewEvent) {
+async function publishReviewEvent(bookId: string, event: ReviewEvent) {
     try {
         const channel = getChannel();
         const aggregates = await reviewRepository.findAvgAndCount(bookId);
@@ -74,7 +74,7 @@ export const reviewService = {
                 throw new ForbiddenError('Book is not published to review');
             }
             const review = await reviewRepository.createReview({ ...input, userId });
-            await publishReviewUpdateEvent(review.bookId, 'REVIEW_CREATED');
+            await publishReviewEvent(review.bookId, 'REVIEW_CREATED');
             return serialize(review);
         } catch (e) {
             // The unique (bookId, userId) index is doing double duty here: it
@@ -93,7 +93,7 @@ export const reviewService = {
         if (review.userId !== userId) throw new ForbiddenError('You do not have permission for this action');
 
         const updated = await reviewRepository.updateReview(id, update);
-        await publishReviewUpdateEvent(review.bookId, 'REVIEW_UPDATED');
+        await publishReviewEvent(review.bookId, 'REVIEW_UPDATED');
         return serialize(updated);
     },
 
@@ -103,7 +103,7 @@ export const reviewService = {
         if (review.userId !== userId) throw new ForbiddenError('You do not have permission for this action');
 
         await reviewRepository.deleteReview(id);
-        await publishReviewUpdateEvent(review.bookId, 'REVIEW_DELETED');
+        await publishReviewEvent(review.bookId, 'REVIEW_DELETED');
     },
 
     async applyStatusChange(payload: BookStatusChangePayload) {

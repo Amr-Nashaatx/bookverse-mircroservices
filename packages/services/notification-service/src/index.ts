@@ -7,7 +7,14 @@ import { TypeBoxTypeProvider } from '@fastify/type-provider-typebox';
 import { notificationRoutes } from './routes/notification.routes.js';
 
 import { config } from './config/index.js';
-import { globalErrorHandler, makeVerifyGatewaySecret } from '@bookverse/shared';
+import {
+    connectBroker,
+    consumeEvents,
+    globalErrorHandler,
+    makeVerifyGatewaySecret,
+    REVIEWS_EXCHANGE,
+} from '@bookverse/shared';
+import { ReviewDLQ, ReviewPostedQueue } from './config/queues.js';
 
 const fastify = Fastify({ logger: true }).withTypeProvider<TypeBoxTypeProvider>();
 
@@ -39,6 +46,12 @@ if (config.nodeEnv !== 'production') {
     });
 }
 
+connectBroker(config.rabbitmq.url, async (channel) => {
+    await channel.assertExchange(REVIEWS_EXCHANGE, 'topic', { durable: true });
+
+    await consumeEvents(channel, ReviewDLQ);
+    await consumeEvents(channel, ReviewPostedQueue);
+});
 // Everything under /notifications requires the caller to be the gateway
 fastify.register(async (secured) => {
     secured.addHook('preHandler', makeVerifyGatewaySecret(config.gateway.secrets));

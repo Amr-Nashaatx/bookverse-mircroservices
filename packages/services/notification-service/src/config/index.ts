@@ -23,6 +23,7 @@ export const config = {
                 : 'amqp://localhost:5672'),
     },
     gateway: {
+        url: 'http://gateway:3000',
         secrets: process.env
             .GATEWAY_ACCEPTED_SECRETS!.split(',')
             .map((s) => s.trim())

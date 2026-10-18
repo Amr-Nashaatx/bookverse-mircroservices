@@ -6,7 +6,7 @@ import { isTransientDbError } from '../lib/transientErrors.js';
 export const ReviewsQueue = {
     exchange: REVIEWS_EXCHANGE,
     queue: Queues['REVIEWS_QUEUE'],
-    patterns: ['review.*'],
+    patterns: ['review.posted', 'review.updated', 'review.deleted'],
     dlx: REVIEWS_DLX,
     handler: reviewEventsHandler,
     isTransient: isTransientDbError,

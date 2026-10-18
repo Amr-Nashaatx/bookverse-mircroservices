@@ -1,4 +1,4 @@
-import { Page, toPage, toSkipTake } from '@bookverse/shared';
+import { Page, ReviewPostedPayload, toPage, toSkipTake } from '@bookverse/shared';
 import type { Notification } from '../generated/prisma/index.js';
 import { notificationRepository } from '../repositories/notification.repository.js';
 import type { ListNotificationsQuery, NotificationData } from '../schemas/notification.schemas.js';
@@ -24,5 +24,9 @@ export const notificationService = {
 
         const rows = await notificationRepository.findForUser(userId, { skip, take });
         return toPage(rows.map(serialize), pageQuery);
+    },
+
+    async createNotificationFromEvent(data: Partial<Notification>) {
+        await notificationRepository.create(data);
     },
 };
