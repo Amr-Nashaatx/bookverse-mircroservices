@@ -23,6 +23,7 @@ renamed and reinvented, problems don't.
 
 - [The rating copy](consistency/rating-copy.md) — book-service holds a number review-service owns, how stale it may be, and who moves it
 - [When a review event can't be applied](consistency/failed-events.md) — retry what might recover, park the rest where it can be read
+- [Not losing an event between the commit and the publish](consistency/outbox.md) — the event is a row in the same transaction; a relay sends it, sometimes twice
 
 ## [Overload](overload/) — more work arrives than can be done, and the queue does the damage
 

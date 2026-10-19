@@ -60,3 +60,15 @@ model IdempotencyKey {
   @@unique([ownerUserId, key])
   @@index([createdAt])
 }
+
+/* Events waiting to be sent. Written in the same transaction as the change
+ * they describe; the relay sends them and marks them sent. */
+model Outbox {
+  id         Int       @id @default(autoincrement()) // relay order
+  eventId    String    @unique @default(uuid()) // created here, in the transaction; sent as messageId
+  exchange   String
+  routingKey String
+  payload    Json
+  createdAt  DateTime  @default(now())
+  sentAt     DateTime?
+}

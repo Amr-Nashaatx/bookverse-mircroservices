@@ -16,8 +16,11 @@ import {
     REVIEWS_EXCHANGE,
     REVIEWS_DLX,
     BOOKS_EXCHANGE,
+    startRelay,
+    getConfirmChannel,
 } from '@bookverse/shared';
 import { ReviewsDlq, ReviewsQueue } from './config/queues.js';
+import { OutboxStore } from './repositories/outbox.repository.js';
 
 const fastify = Fastify({ logger: true }).withTypeProvider<TypeBoxTypeProvider>();
 
@@ -35,6 +38,8 @@ await connectBroker(config.rabbitmq.url, async (channel) => {
     await consumeEvents(channel, ReviewsDlq);
     await consumeEvents(channel, ReviewsQueue);
 });
+// After the first connect, once: the relay asks for the current channel on every tick, so it survives reconnects.
+const stopRelay = startRelay(OutboxStore, getConfirmChannel, { batchSize: 50, intervalMs: 200 });
 // Health check — outside the secured context so the Docker healthcheck reaches it without the gateway secret.
 fastify.get('/health', async (_request, reply) => {
     return reply.send({ status: 'ok', timestamp: new Date().toISOString() });
@@ -51,6 +56,8 @@ fastify.register(async (secured) => {
 // Graceful Shutdown
 const shutdown = async () => {
     await fastify.close();
+    stopRelay();
+    await disconnectBroker();
     process.exit(0);
 };
 

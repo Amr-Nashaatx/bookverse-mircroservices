@@ -1,5 +1,6 @@
 import prisma from '../lib/prisma.js';
 import { Prisma } from '../generated/prisma/index.js';
+import { BookEvents, BOOKS_EXCHANGE, BookStatusChangePayload } from '@bookverse/shared';
 import { BookSortValues } from '../schemas/book.schemas.js';
 
 interface CreateBookWithKeyInput extends Prisma.BookCreateInput {
@@ -101,8 +102,27 @@ export const bookRepository = {
         return prisma.book.findUnique({ where: { id } });
     },
 
+    /* The update and, when the status changed, its event: one transaction, so the
+     * event exists if and only if the update committed. The relay sends it.
+     * Status changes are rare, so a lost status event is not repaired by a later one. */
     async updateBook(id: string, update: Prisma.BookUpdateInput) {
-        return prisma.book.update({ where: { id }, data: { ...update, version: { increment: 1 } } });
+        return prisma.$transaction(async (tx) => {
+            const book = await tx.book.update({ where: { id }, data: { ...update, version: { increment: 1 } } });
+            if (update.status) {
+                await tx.outbox.create({
+                    data: {
+                        exchange: BOOKS_EXCHANGE,
+                        routingKey: BookEvents.STATUS_UPDATED,
+                        payload: {
+                            bookId: book.id,
+                            status: book.status,
+                            version: book.version,
+                        } satisfies BookStatusChangePayload,
+                    },
+                });
+            }
+            return book;
+        });
     },
 
     async applyRatingCopy(id: string, update: Prisma.BookUpdateInput) {

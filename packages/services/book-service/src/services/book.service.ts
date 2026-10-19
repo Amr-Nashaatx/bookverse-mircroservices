@@ -1,15 +1,4 @@
-import {
-    BookEvents,
-    BOOKS_EXCHANGE,
-    ConflictError,
-    getChannel,
-    NotFoundError,
-    Page,
-    publishEvent,
-    ReviewsUpdatedPayload,
-    toPage,
-    toSkipTake,
-} from '@bookverse/shared';
+import { ConflictError, NotFoundError, Page, ReviewsUpdatedPayload, toPage, toSkipTake } from '@bookverse/shared';
 import { bookRepository } from '../repositories/book.repository.js';
 import type { Book, BookStatus } from '../generated/prisma/index.js';
 import type { BookData, CreateBookInput, ListBooksQuery, UpdateBookInput } from '../schemas/book.schemas.js';
@@ -98,20 +87,8 @@ export const bookService = {
 
     async updateBook(bookId: string, update: UpdateBookInput) {
         const status = update.status ? (update.status.toUpperCase() as BookStatus) : undefined;
+        // A status change writes its event in the same transaction (see the repository); the relay sends it.
         const updated = await bookRepository.updateBook(bookId, { ...update, status });
-        if (status) {
-            // Same policy as review-service: the update has committed, so a broker outage
-            // is logged, not turned into a 500. The backfill repairs a missed event.
-            try {
-                publishEvent(getChannel(), BOOKS_EXCHANGE, BookEvents['STATUS_UPDATED'], {
-                    status,
-                    bookId,
-                    version: updated.version,
-                });
-            } catch (err) {
-                console.error({ err, bookId, status }, 'status event not published');
-            }
-        }
         return serialize(updated);
     },
 
