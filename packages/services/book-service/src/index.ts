@@ -42,23 +42,6 @@ fastify.get('/health', async (_request, reply) => {
 
 fastify.setErrorHandler(globalErrorHandler);
 
-if (config.nodeEnv !== 'production') {
-    fastify.addHook('preHandler', async (request, reply) => {
-        const faultDelay = (request.headers['x-fault-delay'] as string) ?? null;
-        const faultStatus = (request.headers['x-fault-status'] as string) ?? null;
-
-        if (faultDelay) {
-            if (!Number.isFinite(parseInt(faultDelay))) return reply.status(400).send('Invalid fault delay header');
-            request.log.warn(`Fault delay fired for ${parseInt(faultDelay)}`);
-            await new Promise((resolve) => setTimeout(resolve, parseInt(faultDelay)));
-        }
-        if (faultStatus) {
-            request.log.warn('Fault status fired');
-            return reply.status(parseInt(faultStatus)).send();
-        }
-    });
-}
-
 // Everything under /books requires the caller to be the gateway
 fastify.register(async (secured) => {
     secured.addHook('preHandler', makeVerifyGatewaySecret(config.gateway.secrets));

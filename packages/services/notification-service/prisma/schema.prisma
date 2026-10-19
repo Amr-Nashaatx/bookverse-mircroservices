@@ -7,21 +7,27 @@ datasource db {
   provider = "postgresql"
 }
 
+/* One table for every kind of notification. What differs per kind lives in
+ * `data`; the columns are only what every kind has. */
 model Notification {
   id String @id @default(uuid())
 
-  // The recipient: the owner of the reviewed book.
+  // The recipient.
   userId String
 
-  // Identity of the event that produced this row. Not unique yet: which
-  // column refuses a redelivered event is still undecided.
-  eventId  String
-  reviewId String
+  // The routing key of the event that produced it, e.g. "review.posted".
+  type String
 
-  bookId String
-  // Snapshot at the time of the notification; a later rename does not rewrite it.
-  bookTitle String
-  rating    Int
+  // The messageId of that event, created with the outbox row and kept across
+  // re-sends. Unique, so the second copy of an event is refused here.
+  eventId String @unique
+
+  // Rendered once, when the notification is made. A later rename of the book
+  // does not rewrite what the reader was told.
+  message String
+
+  // Kind-specific fields a client needs to link somewhere (bookId, reviewId…).
+  data Json
 
   createdAt DateTime @default(now())
 

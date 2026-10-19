@@ -1,4 +1,5 @@
 export const Queues = {
     NOTIFICATIONS_REVIEWS: 'notifications.reviews',
-    NOTIFICATIONS_REVIEWS_DLQ: 'notifications.reviews.dlq',
+    // Shared by every notification queue: they all dead-letter to notifications.dlx.
+    NOTIFICATIONS_DLQ: 'notifications.dlq',
 } as const;

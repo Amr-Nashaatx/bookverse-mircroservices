@@ -10,11 +10,13 @@ import { config } from './config/index.js';
 import {
     connectBroker,
     consumeEvents,
+    disconnectBroker,
     globalErrorHandler,
     makeVerifyGatewaySecret,
+    NOTIFICATIONS_DLX,
     REVIEWS_EXCHANGE,
 } from '@bookverse/shared';
-import { ReviewDLQ, ReviewPostedQueue } from './config/queues.js';
+import { NotificationsDlq, ReviewsQueue } from './config/queues.js';
 
 const fastify = Fastify({ logger: true }).withTypeProvider<TypeBoxTypeProvider>();
 
@@ -29,28 +31,14 @@ fastify.get('/health', async (_request, reply) => {
 
 fastify.setErrorHandler(globalErrorHandler);
 
-if (config.nodeEnv !== 'production') {
-    fastify.addHook('preHandler', async (request, reply) => {
-        const faultDelay = (request.headers['x-fault-delay'] as string) ?? null;
-        const faultStatus = (request.headers['x-fault-status'] as string) ?? null;
-
-        if (faultDelay) {
-            if (!Number.isFinite(parseInt(faultDelay))) return reply.status(400).send('Invalid fault delay header');
-            request.log.warn(`Fault delay fired for ${parseInt(faultDelay)}`);
-            await new Promise((resolve) => setTimeout(resolve, parseInt(faultDelay)));
-        }
-        if (faultStatus) {
-            request.log.warn('Fault status fired');
-            return reply.status(parseInt(faultStatus)).send();
-        }
-    });
-}
-
+// Broker. Every exchange a queue binds to must be asserted first: binding to a
+// missing one closes the channel (404), and nothing after it in setup runs.
 connectBroker(config.rabbitmq.url, async (channel) => {
     await channel.assertExchange(REVIEWS_EXCHANGE, 'topic', { durable: true });
+    await channel.assertExchange(NOTIFICATIONS_DLX, 'topic', { durable: true });
 
-    await consumeEvents(channel, ReviewDLQ);
-    await consumeEvents(channel, ReviewPostedQueue);
+    await consumeEvents(channel, NotificationsDlq);
+    await consumeEvents(channel, ReviewsQueue);
 });
 // Everything under /notifications requires the caller to be the gateway
 fastify.register(async (secured) => {
@@ -61,6 +49,7 @@ fastify.register(async (secured) => {
 // Graceful Shutdown
 const shutdown = async () => {
     await fastify.close();
+    await disconnectBroker();
     process.exit(0);
 };
 

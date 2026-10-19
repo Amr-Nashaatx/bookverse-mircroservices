@@ -10,13 +10,13 @@ export const ListNotificationsQuerySchema = Type.Object({
 });
 export type ListNotificationsQuery = Static<typeof ListNotificationsQuerySchema>;
 
-// Response Schemas — no userId: a caller only ever sees their own.
+/* Response Schemas — no userId: a caller only ever sees their own. The same
+ * shape for every kind; `type` says how to read `data`. */
 export const NotificationSchema = Type.Object({
     id: Type.String({ format: 'uuid' }),
-    reviewId: Type.String(),
-    bookId: Type.String(),
-    bookTitle: Type.String(),
-    rating: Type.Integer(),
+    type: Type.String(),
+    message: Type.String(),
+    data: Type.Record(Type.String(), Type.Union([Type.String(), Type.Number(), Type.Boolean(), Type.Null()])),
     createdAt: Type.String({ format: 'date-time' }),
 });
 

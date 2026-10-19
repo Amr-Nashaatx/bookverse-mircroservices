@@ -2,12 +2,8 @@ import {
     BookStatusChangePayload,
     ConflictError,
     ForbiddenError,
-    getChannel,
     NotFoundError,
     Page,
-    publishEvent,
-    ReviewEvents,
-    REVIEWS_EXCHANGE,
     toPage,
     toSkipTake,
 } from '@bookverse/shared';
@@ -15,6 +11,7 @@ import { PrismaClientKnownRequestError } from '@prisma/client/runtime/client';
 import type { Review } from '../generated/prisma/index.js';
 import { reviewRepository } from '../repositories/review.repository.js';
 import type { CreateReviewInput, ListReviewsQuery, ReviewData, UpdateReviewInput } from '../schemas/review.schemas.js';
+import { publishRatingEvent } from '../messaging/books/publishRatingEvent.js';
 
 // Shape a Prisma Review (with Date objects) into the serializable response DTO.
 function serialize(review: Review): ReviewData {
@@ -29,17 +26,6 @@ function serialize(review: Review): ReviewData {
     };
 }
 
-type ReviewEvent = keyof typeof ReviewEvents;
-
-async function publishReviewEvent(bookId: string, event: ReviewEvent) {
-    try {
-        const channel = getChannel();
-        const aggregates = await reviewRepository.findAvgAndCount(bookId);
-        publishEvent(channel, REVIEWS_EXCHANGE, ReviewEvents[event], aggregates);
-    } catch (err) {
-        console.error({ err, bookId, event }, 'rating event not published');
-    }
-}
 export const reviewService = {
     /* No count query: a "load more" button only asks whether another batch
      * exists, so hasMore is the whole requirement. */
@@ -73,8 +59,8 @@ export const reviewService = {
             if (!bookStatus || bookStatus.status !== 'PUBLISHED') {
                 throw new ForbiddenError('Book is not published to review');
             }
-            const review = await reviewRepository.createReview({ ...input, userId });
-            await publishReviewEvent(review.bookId, 'REVIEW_CREATED');
+            const { avgRating, count, review, version } = await reviewRepository.createReview({ ...input, userId });
+            await publishRatingEvent(review.bookId, 'REVIEW_CREATED', { count, avgRating, version });
             return serialize(review);
         } catch (e) {
             // The unique (bookId, userId) index is doing double duty here: it
@@ -92,9 +78,9 @@ export const reviewService = {
         if (!review) throw new NotFoundError('review not found');
         if (review.userId !== userId) throw new ForbiddenError('You do not have permission for this action');
 
-        const updated = await reviewRepository.updateReview(id, update);
-        await publishReviewEvent(review.bookId, 'REVIEW_UPDATED');
-        return serialize(updated);
+        const { avgRating, count, review: updatedReview, version } = await reviewRepository.updateReview(id, update);
+        await publishRatingEvent(updatedReview.bookId, 'REVIEW_UPDATED', { avgRating, count, version });
+        return serialize(updatedReview);
     },
 
     async deleteReview(id: string, userId: string): Promise<void> {
@@ -102,8 +88,8 @@ export const reviewService = {
         if (!review) throw new NotFoundError('review not found');
         if (review.userId !== userId) throw new ForbiddenError('You do not have permission for this action');
 
-        await reviewRepository.deleteReview(id);
-        await publishReviewEvent(review.bookId, 'REVIEW_DELETED');
+        const { avgRating, count, version } = await reviewRepository.deleteReview(id);
+        await publishRatingEvent(review.bookId, 'REVIEW_DELETED', { avgRating, count, version });
     },
 
     async applyStatusChange(payload: BookStatusChangePayload) {

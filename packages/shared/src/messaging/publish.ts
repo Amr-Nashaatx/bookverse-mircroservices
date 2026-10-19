@@ -1,11 +1,17 @@
 import { Channel } from 'amqplib';
 import { randomUUID } from 'node:crypto';
 
-export function publishEvent(channel: Channel, exchange: string, routingKey: string, payload: unknown): boolean {
+export function publishEvent(
+    channel: Channel,
+    exchange: string,
+    routingKey: string,
+    payload: unknown,
+    messageId?: string,
+): boolean {
     return channel.publish(exchange, routingKey, Buffer.from(JSON.stringify(payload)), {
         persistent: true,
         contentType: 'application/json',
-        messageId: randomUUID(),
+        messageId: messageId ?? randomUUID(),
         timestamp: Date.now(),
     });
 }

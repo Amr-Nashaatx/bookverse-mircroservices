@@ -1,6 +1,8 @@
 import { Channel } from 'amqplib';
 
-type HandlerFunc = (routingKey: string, payload: unknown) => Promise<void>;
+// What the message carries besides its body. Handlers that don't need it declare two parameters.
+export type MessageMeta = { messageId?: string };
+type HandlerFunc = (routingKey: string, payload: unknown, meta: MessageMeta) => Promise<void>;
 export type QueueConfig = {
     exchange: string;
     queue: string;
@@ -56,7 +58,10 @@ export async function consumeEvents(channel: Channel, config: QueueConfig) {
             try {
                 // JSON.parse inside the retried fn: a parse error is deterministic, so it fails fast.
                 await withRetry(
-                    () => handler(msg.fields.routingKey, JSON.parse(msg.content.toString())),
+                    () =>
+                        handler(msg.fields.routingKey, JSON.parse(msg.content.toString()), {
+                            messageId: msg.properties.messageId,
+                        }),
                     isTransient,
                     budgetMs,
                 );

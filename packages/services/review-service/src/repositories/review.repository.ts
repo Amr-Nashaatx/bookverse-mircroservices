@@ -1,7 +1,7 @@
 import prisma from '../lib/prisma.js';
-import { Prisma } from '../generated/prisma/index.js';
+import { Prisma, Review } from '../generated/prisma/index.js';
 import { ReviewSortValues } from '../schemas/review.schemas.js';
-import { BookStatusChangePayload } from '@bookverse/shared';
+import { BookStatusChangePayload, ReviewEvents, ReviewPostedPayload, REVIEWS_EXCHANGE } from '@bookverse/shared';
 
 type ReviewSortValue = (typeof ReviewSortValues)[number];
 export type ReviewPageOptions = { take: number; skip: number; sort: ReviewSortValue };
@@ -20,31 +20,58 @@ function buildOrderBy(sort: ReviewSortValue): Prisma.ReviewOrderByWithRelationIn
     }
 }
 
-export const reviewRepository = {
-    async createReview(data: Prisma.ReviewCreateInput) {
-        return prisma.review.create({ data });
-    },
-
-    async getBookStatus(bookId: string) {
-        return prisma.bookStatus.findUnique({ where: { bookId } });
-    },
-    async findAvgAndCount(bookId: string) {
-        const { aggregates, version } = await prisma.$transaction(async (tx) => {
-            const [{ version }] = await tx.$queryRaw<{ version: number }[]>`
+async function findVersionAndStats(tx: Prisma.TransactionClient, bookId: string) {
+    const [{ version }] = await tx.$queryRaw<{ version: number }[]>`
                 INSERT INTO "BookReviewVersion" VALUES (${bookId}, 1) ON CONFLICT ("bookId")
                 DO UPDATE SET version = "BookReviewVersion".version + 1
                 RETURNING version
             `;
-            const result = await tx.review.aggregate({
-                where: { bookId },
-                _avg: { rating: true },
-                _count: { rating: true },
+
+    // Find aggregate for rating event
+    const aggregate = await tx.review.aggregate({
+        where: { bookId },
+        _avg: { rating: true },
+        _count: { rating: true },
+    });
+
+    return { count: aggregate._count.rating, avgRating: aggregate._avg.rating, version };
+}
+
+function buildReviewPostedPayload(review: Review) {
+    return {
+        bookId: review.bookId,
+        postedAt: review.createdAt.toISOString(),
+        rating: review.rating,
+        reviewerId: review.userId,
+        reviewId: review.id,
+    } satisfies ReviewPostedPayload;
+}
+
+export const reviewRepository = {
+    async createReview(data: Prisma.ReviewCreateInput) {
+        const result = await prisma.$transaction(async (tx) => {
+            const review = await tx.review.create({ data });
+            const { bookId } = review;
+
+            const { avgRating, count, version } = await findVersionAndStats(tx, bookId);
+
+            // Insert outbox row
+            await tx.outbox.create({
+                data: {
+                    exchange: REVIEWS_EXCHANGE,
+                    payload: buildReviewPostedPayload(review),
+                    routingKey: ReviewEvents.REVIEW_POSTED,
+                },
             });
 
-            return { aggregates: result, version };
+            return { review, version, count, avgRating };
         });
 
-        return { avgRating: aggregates._avg.rating, count: aggregates._count.rating, bookId, version };
+        return result;
+    },
+
+    async getBookStatus(bookId: string) {
+        return prisma.bookStatus.findUnique({ where: { bookId } });
     },
     async findReviewsByBookId(bookId: string, page: ReviewPageOptions) {
         return prisma.review.findMany({
@@ -60,11 +87,25 @@ export const reviewRepository = {
     },
 
     async updateReview(id: string, update: Prisma.ReviewUpdateInput) {
-        return prisma.review.update({ where: { id }, data: update });
+        const reviewData = await prisma.$transaction(async (tx) => {
+            const review = await tx.review.update({ where: { id }, data: update });
+            const { bookId } = review;
+            const { avgRating, count, version } = await findVersionAndStats(tx, bookId);
+            return { review, avgRating, count, version };
+        });
+
+        return reviewData;
     },
 
     async deleteReview(id: string) {
-        return prisma.review.delete({ where: { id } });
+        const reviewData = await prisma.$transaction(async (tx) => {
+            const { bookId } = await tx.review.delete({ where: { id } });
+
+            const { avgRating, count, version } = await findVersionAndStats(tx, bookId);
+            return { avgRating, count, bookId, version };
+        });
+
+        return reviewData;
     },
 
     async applyStatusChange(payload: BookStatusChangePayload) {

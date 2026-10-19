@@ -11,7 +11,7 @@ renamed and reinvented, problems don't.
 - [Timeouts on every outbound call](partial-failure/timeouts.md) — what the gateway waits, and how long it waited before anyone chose
 - [Retrying reads, never writes](partial-failure/read-retries.md) — when repeating a call is safe, and who decides
 - [Idempotent writes](partial-failure/idempotent-writes.md) — surviving a retry of a request that already succeeded
-- [Fault injection is a first-class dev capability](partial-failure/fault-injection.md) — you can't claim resilience you can't reproduce
+- [Fault injection is a first-class dev capability](partial-failure/fault-injection.md) — you can't claim resilience you can't reproduce (later removed: real outages replaced it)
 
 ## [Boundaries](boundaries/) — where one service ends and the next begins, and what may cross
 
